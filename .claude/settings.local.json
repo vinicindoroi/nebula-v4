@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx supabase *)",
+      "Bash(export SUPABASE_ACCESS_TOKEN=\"sbp_b8d4ff31fac98ef55f0cc6fb3369592640e3c0b3\")",
+      "Bash(grep -n \"video\\\\|lesson\\\\|Lesson\" \"c:/Users/vinic/Downloads/nebula-member-hub-main/nebula-member-hub-main/src/routes/_app.courses.\\\\$courseId.tsx\" | head -40)",
+      "Read(//c/Users/vinic/Downloads/nebula-member-hub-main/nebula-member-hub-main/src/routes/**)",
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(git init *)",
+      "Bash(git branch *)"
+    ]
+  }
+}
