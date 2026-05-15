@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Award, Flame, Star, Trophy, Zap, Target, User, Mail, MapPin, Phone, FileText,
-  Save, Calendar, BadgeCheck,
+  Save, Calendar, BadgeCheck, Camera, Instagram,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -40,8 +40,10 @@ function ProfilePage() {
     },
   });
 
-  const [form, setForm] = useState({ full_name: "", bio: "", phone: "", location: "" });
+  const [form, setForm] = useState({ full_name: "", bio: "", phone: "", location: "", instagram: "" });
   const [dirty, setDirty] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const avatarRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (profile) {
@@ -50,6 +52,7 @@ function ProfilePage() {
         bio: profile.bio ?? "",
         phone: profile.phone ?? "",
         location: profile.location ?? "",
+        instagram: (profile as any).instagram ?? "",
       });
       setDirty(false);
     }
@@ -57,16 +60,49 @@ function ProfilePage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("profiles").update(form).eq("id", user!.id);
+      const payload: Record<string, any> = {
+        full_name: form.full_name.trim() || null,
+        bio: form.bio.trim() || null,
+        phone: form.phone.trim() || null,
+        location: form.location.trim() || null,
+      };
+      // Only include instagram if user filled it (column may not exist yet)
+      if (form.instagram.trim()) payload.instagram = form.instagram.trim();
+
+      const { error, data } = await (supabase as any)
+        .from("profiles")
+        .update(payload)
+        .eq("id", user!.id)
+        .select();
+      console.log("[profile save]", { userId: user!.id, payload, error, data });
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Nenhum registro atualizado. Verifique permissões.");
     },
     onSuccess: () => {
       toast.success("Perfil atualizado");
       setDirty(false);
       qc.invalidateQueries({ queryKey: ["profile"] });
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error("Erro ao salvar: " + e.message),
   });
+
+  const uploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error("Imagem deve ter no máximo 2MB"); return; }
+    setUploading(true);
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `${user!.id}/avatar.${ext}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (upErr) { toast.error("Erro no upload: " + upErr.message); setUploading(false); return; }
+    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+    const avatar_url = `${urlData.publicUrl}?t=${Date.now()}`;
+    const { error } = await (supabase as any).from("profiles").update({ avatar_url }).eq("id", user!.id);
+    setUploading(false);
+    if (error) return toast.error("Erro ao salvar: " + error.message);
+    toast.success("Foto atualizada");
+    qc.invalidateQueries({ queryKey: ["profile"] });
+  };
 
   const update = (patch: Partial<typeof form>) => {
     setForm((p) => ({ ...p, ...patch }));
@@ -104,10 +140,22 @@ function ProfilePage() {
       <section className="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-primary/10 via-white/[0.02] to-transparent p-6 md:p-8">
         <div className="absolute top-0 right-0 w-72 h-72 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-5">
-          <div className="relative">
-            <div className="h-24 w-24 rounded-2xl gradient-primary flex items-center justify-center text-3xl font-semibold text-primary-foreground shadow-[0_16px_40px_-12px_oklch(0.65_0.22_290/0.6)]">
-              {initials}
-            </div>
+          <div className="relative group">
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="Avatar" className="h-24 w-24 rounded-2xl object-cover shadow-[0_16px_40px_-12px_oklch(0.65_0.22_290/0.6)]" />
+            ) : (
+              <div className="h-24 w-24 rounded-2xl gradient-primary flex items-center justify-center text-3xl font-semibold text-primary-foreground shadow-[0_16px_40px_-12px_oklch(0.65_0.22_290/0.6)]">
+                {initials}
+              </div>
+            )}
+            <button
+              onClick={() => avatarRef.current?.click()}
+              disabled={uploading}
+              className="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+            >
+              <Camera className="h-5 w-5 text-white" />
+            </button>
+            <input ref={avatarRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={uploadAvatar} />
             {profile?.plan && profile.plan !== "Free" && (
               <div className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">
                 <BadgeCheck className="h-4 w-4 text-white" />
@@ -172,6 +220,14 @@ function ProfilePage() {
                 onChange={(e) => update({ location: e.target.value })}
                 className={inputClass}
                 placeholder="Cidade, País"
+              />
+            </Field>
+            <Field label="Instagram" icon={Instagram} hint="Seu @ sem o arroba.">
+              <input
+                value={form.instagram}
+                onChange={(e) => update({ instagram: e.target.value.replace(/^@/, "") })}
+                className={inputClass}
+                placeholder="seuusuario"
               />
             </Field>
             <div className="sm:col-span-2">

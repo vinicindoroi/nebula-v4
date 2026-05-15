@@ -1,10 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Play, ArrowLeft, Lock } from "lucide-react";
+import { Check, Play, ArrowLeft, Lock, Download, Paperclip } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { NebulaPlayer, type Chapter } from "@/components/player/NebulaPlayer";
+import { LessonComments } from "@/components/lessons/LessonComments";
+import { getSignedVideoUrl, isStoragePath, getAttachmentDownloadUrl } from "@/lib/storage";
+import {
+  usePlayerSettings,
+  useVideoProgress,
+  useSaveVideoProgress,
+  useBookmarks,
+  useAddBookmark,
+  useRemoveBookmark,
+} from "@/hooks/use-player-settings";
 
 export const Route = createFileRoute("/_app/courses/$courseId")({
   component: CourseDetail,
@@ -18,8 +29,14 @@ type Lesson = {
   duration: number | null;
   duration_min: number | null;
   video_url: string | null;
+  video_path: string | null;
+  poster_url: string | null;
+  captions_url: string | null;
+  chapters: Chapter[] | null;
   content: string | null;
   is_free: boolean | null;
+  is_premium: boolean | null;
+  offer_id: string | null;
   module_id: string | null;
 };
 
@@ -28,6 +45,8 @@ type Module = {
   title: string;
   description: string | null;
   position: number;
+  is_premium: boolean | null;
+  offer_id: string | null;
 };
 
 function CourseDetail() {
@@ -40,11 +59,13 @@ function CourseDetail() {
     queryKey: ["course", courseId, user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const [c, m, l, p] = await Promise.all([
+      const [c, m, l, p, o, prof] = await Promise.all([
         supabase.from("courses").select("*").eq("id", courseId).single(),
         supabase.from("modules").select("*").eq("course_id", courseId).order("position"),
         supabase.from("lessons").select("*").eq("course_id", courseId).order("position"),
         supabase.from("lesson_progress").select("lesson_id").eq("user_id", user!.id),
+        supabase.from("offers").select("*").eq("active", true),
+        (supabase as any).from("profiles").select("plan").eq("id", user!.id).maybeSingle(),
       ]);
       if (c.error) throw c.error;
       if (l.error) throw l.error;
@@ -52,8 +73,10 @@ function CourseDetail() {
       return {
         course: c.data,
         modules: (m.data ?? []) as Module[],
-        lessons: (l.data ?? []) as Lesson[],
+        lessons: (l.data ?? []) as unknown as Lesson[],
         done,
+        offers: (o.data ?? []) as Array<{ id: string; name: string; description: string | null; price: number; checkout_url: string; badge_text: string | null }>,
+        userPlan: ((prof.data?.plan as string) ?? "free").toLowerCase(),
       };
     },
   });
@@ -90,11 +113,27 @@ function CourseDetail() {
   if (isLoading) return <div className="text-sm text-muted-foreground">Carregando...</div>;
   if (error || !data) return <div className="text-sm text-red-400">Erro ao carregar curso.</div>;
 
-  const { course, modules, lessons, done } = data;
+  const { course, modules, lessons, done, offers, userPlan } = data;
   const total = lessons.length;
   const completed = lessons.filter((l) => done.has(l.id)).length;
   const progress = total ? Math.round((completed / total) * 100) : 0;
   const activeLesson = lessons.find((l) => l.id === activeLessonId) ?? lessons[0];
+
+  // Access level logic: check user plan against course access_level
+  const planHierarchy: Record<string, number> = { free: 0, pro: 1, premium: 2 };
+  const userLevel = planHierarchy[userPlan] ?? 0;
+  const courseAccessLevel = (course.access_level ?? "free").toLowerCase();
+  const courseLevel = planHierarchy[courseAccessLevel] ?? 0;
+  const accessDenied = userLevel < courseLevel;
+
+  // Premium offer logic (for individual lessons/modules with offer_id)
+  const getOffer = (offerId: string | null | undefined) => offers.find((o) => o.id === offerId);
+  const activeModule = modules.find((m) => m.id === activeLesson?.module_id);
+  const modulePremium = activeModule?.is_premium && activeModule?.offer_id;
+  const lessonPremium = activeLesson?.is_premium && activeLesson?.offer_id;
+  const premiumOfferId = lessonPremium ? activeLesson.offer_id : modulePremium ? activeModule.offer_id : null;
+  const premiumOffer = premiumOfferId ? getOffer(premiumOfferId) : null;
+  const isLocked = accessDenied || !!premiumOffer;
 
   // group lessons by module, plus orphans (no module_id)
   const orphans = lessons.filter((l) => !l.module_id);
@@ -109,15 +148,24 @@ function CourseDetail() {
         <ArrowLeft className="h-3.5 w-3.5" /> Voltar
       </Link>
 
-      <header className="glass-strong rounded-2xl p-6">
-        {course.tag && <span className="text-[10px] uppercase tracking-wider text-primary">{course.tag}</span>}
-        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight mt-1">{course.title}</h1>
-        {course.description && <p className="text-sm text-muted-foreground mt-2">{course.description}</p>}
-        <div className="mt-4 flex items-center gap-3">
-          <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-            <div className="h-full gradient-primary" style={{ width: `${progress}%` }} />
+      <header className="glass-strong rounded-2xl overflow-hidden relative">
+        <div className="absolute inset-0">
+          {course.cover_url && (
+            <img src={course.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          )}
+          <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${course.gradient_from || "#6366f1"}, ${(course.gradient_to || "#8b5cf6")}00)` }} />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20" />
+        </div>
+        <div className="relative p-6">
+          {course.tag && <span className="text-[10px] uppercase tracking-wider text-primary bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full">{course.tag}</span>}
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight mt-1 text-white drop-shadow-lg">{course.title}</h1>
+          {course.description && <p className="text-sm text-white/70 mt-2">{course.description}</p>}
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex-1 h-1.5 rounded-full bg-white/20 overflow-hidden">
+              <div className="h-full gradient-primary" style={{ width: `${progress}%` }} />
+            </div>
+            <span className="text-xs text-white/80">{completed}/{total} • {progress}%</span>
           </div>
-          <span className="text-xs text-muted-foreground">{completed}/{total} • {progress}%</span>
         </div>
       </header>
 
@@ -129,7 +177,56 @@ function CourseDetail() {
         <div className="grid lg:grid-cols-[1fr_320px] gap-6">
           {/* Player + content */}
           <div className="space-y-4 min-w-0">
-            <LessonPlayer lesson={activeLesson} />
+            {isLocked ? (
+              <div className="aspect-video w-full rounded-2xl glass relative overflow-hidden flex flex-col items-center justify-center text-center p-8">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/30" />
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="h-16 w-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+                    <Lock className="h-7 w-7 text-amber-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">
+                    {accessDenied ? `Conteúdo ${courseAccessLevel.charAt(0).toUpperCase() + courseAccessLevel.slice(1)}` : "Conteúdo Premium"}
+                  </h3>
+                  <p className="text-sm text-white/60 mt-2 max-w-sm">
+                    {accessDenied
+                      ? `Este curso requer o plano ${courseAccessLevel.charAt(0).toUpperCase() + courseAccessLevel.slice(1)}. Faça upgrade para desbloquear.`
+                      : premiumOffer?.description || "Desbloqueie este conteúdo para ter acesso completo."}
+                  </p>
+                  {premiumOffer && (
+                    <div className="mt-4 flex flex-col items-center gap-2">
+                      <span className="text-2xl font-bold text-white">R$ {Number(premiumOffer.price).toFixed(2)}</span>
+                      {premiumOffer.badge_text && (
+                        <span className="text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 font-medium">{premiumOffer.badge_text}</span>
+                      )}
+                      <a
+                        href={premiumOffer.checkout_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 gradient-primary text-primary-foreground px-6 py-3 rounded-xl text-sm font-medium shadow-[0_8px_24px_-8px_oklch(0.65_0.22_290/0.6)] hover:scale-105 transition-transform"
+                      >
+                        Desbloquear agora
+                      </a>
+                    </div>
+                  )}
+                  {accessDenied && !premiumOffer && (
+                    <div className="mt-4">
+                      <a
+                        href="/settings"
+                        className="gradient-primary text-primary-foreground px-6 py-3 rounded-xl text-sm font-medium shadow-[0_8px_24px_-8px_oklch(0.65_0.22_290/0.6)] hover:scale-105 transition-transform inline-block"
+                      >
+                        Fazer upgrade
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <LessonPlayer
+                lesson={activeLesson}
+                lessons={lessons}
+                onNextLesson={(nextId) => setActiveLessonId(nextId)}
+              />
+            )}
 
             <div className="glass rounded-2xl p-5">
               <div className="flex items-start justify-between gap-4">
@@ -169,6 +266,10 @@ function CourseDetail() {
                 </div>
               )}
             </div>
+
+            {/* Comentários da aula */}
+            <LessonAttachments lessonId={activeLesson.id} />
+            <LessonComments lessonId={activeLesson.id} />
           </div>
 
           {/* Sidebar com módulos/aulas */}
@@ -180,14 +281,17 @@ function CourseDetail() {
               {grouped.map(({ mod, items }) => (
                 <div key={mod?.id ?? "orphans"}>
                   {mod && (
-                    <div className="px-2 pt-2 pb-1 text-xs font-medium text-foreground/80">
+                    <div className="px-2 pt-2 pb-1 text-xs font-medium text-foreground/80 flex items-center gap-2">
                       {mod.title}
+                      {mod.is_premium && <Lock className="h-3 w-3 text-amber-400" />}
                     </div>
                   )}
                   <div className="space-y-0.5">
                     {items.map((l, i) => {
                       const isDone = done.has(l.id);
                       const isActive = l.id === activeLesson.id;
+                      const lMod = modules.find((m) => m.id === l.module_id);
+                      const lLocked = accessDenied || (l.is_premium && l.offer_id) || (lMod?.is_premium && lMod?.offer_id);
                       return (
                         <button
                           key={l.id}
@@ -198,14 +302,16 @@ function CourseDetail() {
                         >
                           <div
                             className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 ${
-                              isDone
-                                ? "gradient-primary text-primary-foreground"
-                                : isActive
-                                  ? "bg-primary/20 text-primary"
-                                  : "bg-white/5 text-muted-foreground"
+                              lLocked
+                                ? "bg-amber-500/10 text-amber-400"
+                                : isDone
+                                  ? "gradient-primary text-primary-foreground"
+                                  : isActive
+                                    ? "bg-primary/20 text-primary"
+                                    : "bg-white/5 text-muted-foreground"
                             }`}
                           >
-                            {isDone ? <Check className="h-3.5 w-3.5" /> : <Play className="h-3 w-3" fill="currentColor" />}
+                            {lLocked ? <Lock className="h-3 w-3" /> : isDone ? <Check className="h-3.5 w-3.5" /> : <Play className="h-3 w-3" fill="currentColor" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-xs font-medium truncate">
@@ -218,6 +324,11 @@ function CourseDetail() {
                           {l.is_free && (
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 uppercase">
                               Free
+                            </span>
+                          )}
+                          {lLocked && !l.is_free && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 uppercase">
+                              Premium
                             </span>
                           )}
                         </button>
@@ -234,9 +345,76 @@ function CourseDetail() {
   );
 }
 
-function LessonPlayer({ lesson }: { lesson: Lesson }) {
-  const url = lesson.video_url?.trim();
-  const embed = url ? toEmbedUrl(url) : null;
+function LessonPlayer({ lesson, lessons, onNextLesson }: { lesson: Lesson; lessons: Lesson[]; onNextLesson: (id: string) => void }) {
+  const { user } = useAuth();
+  const { data: settings, isLoading: settingsLoading } = usePlayerSettings();
+  const { data: videoProgress } = useVideoProgress(lesson.id, user?.id);
+  const saveProgress = useSaveVideoProgress();
+  const { data: bookmarks = [] } = useBookmarks(lesson.id, user?.id);
+  const addBookmark = useAddBookmark();
+  const removeBookmark = useRemoveBookmark();
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [resolvedPoster, setResolvedPoster] = useState<string | null>(null);
+
+  const url = lesson.video_url?.trim() || lesson.video_path?.trim();
+
+  // Resolve signed URL for Supabase storage paths
+  useEffect(() => {
+    if (!url) { setResolvedUrl(null); return; }
+    if (isStoragePath(url)) {
+      getSignedVideoUrl(url).then(setResolvedUrl).catch(() => setResolvedUrl(null));
+    } else {
+      setResolvedUrl(url);
+    }
+  }, [url]);
+
+  // Resolve poster URL
+  useEffect(() => {
+    const poster = lesson.poster_url?.trim();
+    if (!poster) { setResolvedPoster(null); return; }
+    if (isStoragePath(poster)) {
+      getSignedVideoUrl(poster).then(setResolvedPoster).catch(() => setResolvedPoster(null));
+    } else {
+      setResolvedPoster(poster);
+    }
+  }, [lesson.poster_url]);
+
+  const handleProgress = useCallback((time: number, duration: number) => {
+    if (!user?.id || !lesson.id) return;
+    saveProgress.mutate({
+      userId: user.id,
+      lessonId: lesson.id,
+      currentTime: time,
+      duration,
+    });
+  }, [user?.id, lesson.id, saveProgress]);
+
+  const handleAddBookmark = useCallback((time: number) => {
+    if (!user?.id) return;
+    const label = prompt("Nome do marcador (opcional):");
+    addBookmark.mutate({
+      userId: user.id,
+      lessonId: lesson.id,
+      timeSeconds: time,
+      label: label || undefined,
+    });
+    toast.success("Marcador adicionado");
+  }, [user?.id, lesson.id, addBookmark]);
+
+  const handleRemoveBookmark = useCallback((id: string) => {
+    if (!user?.id) return;
+    removeBookmark.mutate({ id, lessonId: lesson.id, userId: user.id });
+  }, [user?.id, lesson.id, removeBookmark]);
+
+  const handleEnded = useCallback(() => {
+    if (!settings?.autoplay_next) return;
+    const currentIdx = lessons.findIndex((l) => l.id === lesson.id);
+    const next = lessons[currentIdx + 1];
+    if (next) {
+      onNextLesson(next.id);
+      toast.info(`Avançando para: ${next.title}`);
+    }
+  }, [settings?.autoplay_next, lessons, lesson.id, onNextLesson]);
 
   if (!url) {
     return (
@@ -250,6 +428,8 @@ function LessonPlayer({ lesson }: { lesson: Lesson }) {
     );
   }
 
+  // If it's an embeddable URL (YouTube, Vimeo, etc.), use iframe
+  const embed = toEmbedUrl(url);
   if (embed) {
     return (
       <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/10">
@@ -265,11 +445,30 @@ function LessonPlayer({ lesson }: { lesson: Lesson }) {
     );
   }
 
-  // direct video file (mp4/webm etc)
+  // Custom player for direct video files
+  if (!resolvedUrl) {
+    return (
+      <div className="aspect-video w-full rounded-2xl bg-black border border-white/10 flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Carregando player...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/10">
-      <video key={url} src={url} controls className="w-full h-full" />
-    </div>
+    <NebulaPlayer
+      src={resolvedUrl}
+      poster={resolvedPoster}
+      title={lesson.title}
+      captionsUrl={lesson.captions_url}
+      chapters={lesson.chapters}
+      settings={settings!}
+      startAt={videoProgress?.current_time ?? 0}
+      bookmarks={bookmarks}
+      onProgress={handleProgress}
+      onAddBookmark={handleAddBookmark}
+      onRemoveBookmark={handleRemoveBookmark}
+      onEnded={handleEnded}
+    />
   );
 }
 
@@ -321,4 +520,75 @@ function toEmbedUrl(raw: string): string | null {
   } catch {
     return null;
   }
+}
+
+function LessonAttachments({ lessonId }: { lessonId: string }) {
+  type Attachment = { id: string; file_name: string; file_path: string; file_size: number; mime_type: string | null };
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("lesson_attachments")
+      .select("*")
+      .eq("lesson_id", lessonId)
+      .order("created_at")
+      .then(({ data }) => setAttachments((data ?? []) as Attachment[]));
+  }, [lessonId]);
+
+  if (attachments.length === 0) return null;
+
+  const handleDownload = async (att: Attachment) => {
+    setDownloading(att.id);
+    try {
+      const url = await getAttachmentDownloadUrl(att.file_path);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = att.file_name;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err: any) {
+      toast.error("Erro ao baixar arquivo");
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <div className="glass rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Paperclip className="h-4 w-4 text-primary" />
+        <h3 className="text-sm font-medium">Materiais para download</h3>
+      </div>
+      <div className="space-y-2">
+        {attachments.map((att) => (
+          <button
+            key={att.id}
+            onClick={() => handleDownload(att)}
+            disabled={downloading === att.id}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/5 hover:border-primary/30 hover:bg-white/[0.05] transition text-left group disabled:opacity-50"
+          >
+            <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition">
+              <Download className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">{att.file_name}</div>
+              <div className="text-[10px] text-muted-foreground">{formatSize(att.file_size)}</div>
+            </div>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider shrink-0">
+              {downloading === att.id ? "Baixando..." : "Download"}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }

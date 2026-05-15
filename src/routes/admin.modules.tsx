@@ -3,16 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Plus, Trash2, ChevronRight, Layers, BookOpen, Edit3, Video, Clock,
   GripVertical, ArrowUp, ArrowDown, FileText, Link as LinkIcon, Search,
+  Paperclip, Upload, X, Download, Crown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Modal, Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
+import { uploadAttachment, removeAttachment } from "@/lib/storage";
 
 export const Route = createFileRoute("/admin/modules")({ component: Page });
 
 type Course = { id: string; title: string };
-type Module = { id: string; title: string; description: string | null; position: number; course_id: string };
-type Lesson = { id: string; title: string; description: string | null; video_url: string | null; duration: number | null; position: number; module_id: string; course_id: string; is_free: boolean | null };
+type Module = { id: string; title: string; description: string | null; position: number; course_id: string; is_premium: boolean | null; offer_id: string | null };
+type Lesson = { id: string; title: string; description: string | null; video_url: string | null; duration: number | null; position: number; module_id: string; course_id: string; is_free: boolean | null; is_premium: boolean | null; offer_id: string | null };
+type Offer = { id: string; name: string };
 
 function Page() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -24,12 +27,17 @@ function Page() {
 
   const [editingModule, setEditingModule] = useState<Partial<Module> | null>(null);
   const [editingLesson, setEditingLesson] = useState<{ moduleId: string; data: Partial<Lesson> } | null>(null);
+  const [offers, setOffers] = useState<Offer[]>([]);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("courses").select("id,title").order("title");
+      const [{ data }, { data: of }] = await Promise.all([
+        supabase.from("courses").select("id,title").order("title"),
+        supabase.from("offers").select("id,name").eq("active", true),
+      ]);
       setCourses((data ?? []) as Course[]);
       if (data?.[0]) setSelected(data[0].id);
+      setOffers((of ?? []) as Offer[]);
     })();
   }, []);
 
@@ -270,6 +278,7 @@ function Page() {
           initial={editingModule}
           courseId={selected!}
           nextPos={modules.length}
+          offers={offers}
           onClose={() => setEditingModule(null)}
           onSaved={() => { setEditingModule(null); loadModules(); }}
         />
@@ -281,6 +290,7 @@ function Page() {
           moduleId={editingLesson.moduleId}
           courseId={selected!}
           nextPos={(lessons[editingLesson.moduleId] ?? []).length}
+          offers={offers}
           onClose={() => setEditingLesson(null)}
           onSaved={() => { const mid = editingLesson.moduleId; setEditingLesson(null); loadLessons(mid); }}
         />
@@ -303,13 +313,13 @@ function Stat({ icon: Icon, label, value, text }: { icon: any; label: string; va
   );
 }
 
-function ModuleModal({ initial, courseId, nextPos, onClose, onSaved }: { initial: Partial<Module>; courseId: string; nextPos: number; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ title: initial.title ?? "", description: initial.description ?? "" });
+function ModuleModal({ initial, courseId, nextPos, offers, onClose, onSaved }: { initial: Partial<Module>; courseId: string; nextPos: number; offers: Offer[]; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({ title: initial.title ?? "", description: initial.description ?? "", is_premium: initial.is_premium ?? false, offer_id: initial.offer_id ?? "" });
   const [saving, setSaving] = useState(false);
   const save = async () => {
     if (!f.title.trim()) return toast.error("Informe um título");
     setSaving(true);
-    const payload = { title: f.title, description: f.description || null, course_id: courseId };
+    const payload = { title: f.title, description: f.description || null, course_id: courseId, is_premium: f.is_premium, offer_id: f.offer_id || null };
     const { error } = initial.id
       ? await supabase.from("modules").update(payload).eq("id", initial.id)
       : await supabase.from("modules").insert({ ...payload, position: nextPos });
@@ -340,19 +350,82 @@ function ModuleModal({ initial, courseId, nextPos, onClose, onSaved }: { initial
       <Field label="Descrição" icon={FileText} hint="Opcional. Aparece como subtítulo do módulo.">
         <textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} rows={3} className={`${inputClass} resize-none`} />
       </Field>
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+        <Field label="Acesso" icon={Crown} hint="Quem pode acessar este módulo">
+          <select value={f.is_premium ? (f.offer_id || "pro") : "free"} onChange={(e) => { const v = e.target.value; if (v === "free") { setF({ ...f, is_premium: false, offer_id: "" }); } else { setF({ ...f, is_premium: true, offer_id: v }); } }} className={inputClass}>
+            <option value="free">Free — Todos os membros</option>
+            <option value="pro">Pro</option>
+            <option value="premium">Premium</option>
+          </select>
+        </Field>
+      </div>
     </Modal>
   );
 }
 
-function LessonModal({ initial, moduleId, courseId, nextPos, onClose, onSaved }: { initial: Partial<Lesson>; moduleId: string; courseId: string; nextPos: number; onClose: () => void; onSaved: () => void }) {
+function LessonModal({ initial, moduleId, courseId, nextPos, offers, onClose, onSaved }: { initial: Partial<Lesson>; moduleId: string; courseId: string; nextPos: number; offers: Offer[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({
     title: initial.title ?? "",
     description: initial.description ?? "",
     video_url: initial.video_url ?? "",
     duration: initial.duration ?? 0,
     is_free: initial.is_free ?? false,
+    is_premium: initial.is_premium ?? false,
+    offer_id: initial.offer_id ?? "",
   });
   const [saving, setSaving] = useState(false);
+
+  // Attachments state
+  type Attachment = { id: string; file_name: string; file_path: string; file_size: number; mime_type: string | null };
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (!initial.id) return;
+    supabase
+      .from("lesson_attachments")
+      .select("*")
+      .eq("lesson_id", initial.id)
+      .order("created_at")
+      .then(({ data }) => setAttachments((data ?? []) as Attachment[]));
+  }, [initial.id]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !initial.id) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const path = await uploadAttachment(file);
+        const { data, error } = await supabase
+          .from("lesson_attachments")
+          .insert({ lesson_id: initial.id, file_name: file.name, file_path: path, file_size: file.size, mime_type: file.type || null })
+          .select()
+          .single();
+        if (error) throw error;
+        setAttachments((prev) => [...prev, data as Attachment]);
+      }
+      toast.success("Arquivo(s) enviado(s)");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao enviar arquivo");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveAttachment = async (att: Attachment) => {
+    if (!confirm(`Remover "${att.file_name}"?`)) return;
+    try {
+      await removeAttachment(att.file_path);
+      await supabase.from("lesson_attachments").delete().eq("id", att.id);
+      setAttachments((prev) => prev.filter((a) => a.id !== att.id));
+      toast.success("Arquivo removido");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao remover");
+    }
+  };
+
   const save = async () => {
     if (!f.title.trim()) return toast.error("Informe um título");
     setSaving(true);
@@ -362,6 +435,8 @@ function LessonModal({ initial, moduleId, courseId, nextPos, onClose, onSaved }:
       video_url: f.video_url || null,
       duration: f.duration || null,
       is_free: f.is_free,
+      is_premium: f.is_premium,
+      offer_id: f.offer_id || null,
       module_id: moduleId,
       course_id: courseId,
     };
@@ -409,6 +484,49 @@ function LessonModal({ initial, moduleId, courseId, nextPos, onClose, onSaved }:
           </label>
         </Field>
       </div>
+
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+        <Field label="Acesso" icon={Crown} hint="Quem pode acessar esta aula">
+          <select value={f.is_free ? "free_preview" : f.is_premium ? (f.offer_id || "pro") : "free"} onChange={(e) => { const v = e.target.value; if (v === "free") { setF({ ...f, is_free: false, is_premium: false, offer_id: "" }); } else if (v === "free_preview") { setF({ ...f, is_free: true, is_premium: false, offer_id: "" }); } else { setF({ ...f, is_free: false, is_premium: true, offer_id: v }); } }} className={inputClass}>
+            <option value="free">Free — Todos os membros</option>
+            <option value="free_preview">Gratuita — Preview aberto</option>
+            <option value="pro">Pro</option>
+            <option value="premium">Premium</option>
+          </select>
+        </Field>
+      </div>
+
+      {/* Attachments section */}
+      {initial.id && (
+        <div className="mt-2 space-y-2">
+          <Field label="Arquivos para download" icon={Paperclip} hint="PDF, TXT, DOC, ZIP... (máx 50MB cada)">
+            <div className="space-y-2">
+              {attachments.map((att) => (
+                <div key={att.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5">
+                  <Download className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm truncate flex-1">{att.file_name}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">{formatFileSize(att.file_size)}</span>
+                  <button
+                    onClick={() => handleRemoveAttachment(att)}
+                    className="p-1 rounded hover:bg-red-500/10 text-red-400 transition"
+                    title="Remover arquivo"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed border-white/10 hover:border-primary/40 cursor-pointer transition ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">{uploading ? "Enviando..." : "Clique para enviar arquivos"}</span>
+                <input type="file" multiple onChange={handleFileUpload} className="hidden" />
+              </label>
+            </div>
+          </Field>
+        </div>
+      )}
+      {!initial.id && (
+        <p className="text-xs text-muted-foreground mt-2">Salve a aula primeiro para poder anexar arquivos.</p>
+      )}
     </Modal>
   );
 }
@@ -418,4 +536,10 @@ function formatDur(min: number) {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return m ? `${h}h${m}min` : `${h}h`;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

@@ -116,7 +116,7 @@ export function Field({ label, icon: Icon, required, hint, children }: FieldProp
 export const inputClass =
   "w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/50 hover:bg-white/[0.06] hover:border-white/15 focus:bg-white/[0.06] focus:border-primary/50 focus:ring-[3px] focus:ring-primary/15";
 
-export const selectClass = `${inputClass} appearance-none pr-9 bg-no-repeat`;
+export const selectClass = `${inputClass} appearance-none pr-9 bg-no-repeat [&>option]:bg-[#1a1a2e] [&>option]:text-white`;
 
 export const selectStyle: React.CSSProperties = {
   backgroundImage:

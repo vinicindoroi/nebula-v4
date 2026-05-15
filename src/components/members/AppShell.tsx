@@ -1,11 +1,13 @@
 import { Link, useRouterState, Outlet, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, GraduationCap, Users, User, Settings, Search, Bell,
-  Menu, X, Sparkles, LogOut, Shield,
+  Menu, X, Sparkles, LogOut, Shield, MessageSquare, Bookmark,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
+import { usePresence } from "@/hooks/use-presence";
+import { NotificationBell } from "@/components/members/NotificationBell";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 type NavGroup = { label: string; items: NavItem[] };
@@ -20,6 +22,8 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/courses", label: "Cursos", icon: GraduationCap },
       { to: "/community", label: "Comunidade", icon: Users },
+      { to: "/forum", label: "Fórum", icon: MessageSquare },
+      { to: "/saved", label: "Salvos", icon: Bookmark },
     ],
   },
   {
@@ -39,10 +43,23 @@ export function AppShell() {
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
+  usePresence();
   const email = user?.email ?? "";
   const name = (user?.user_metadata as any)?.full_name || email.split("@")[0] || "Membro";
   const initials = name.slice(0, 2).toUpperCase();
   const current = allNav.find((n) => path === n.to || path.startsWith(n.to + "/"))?.label ?? "Membros";
+
+  const siteSettings = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("admin_settings_v1");
+      if (!raw) return { name: "Membros", logoUrl: "", primaryColor: "#8b5cf6" };
+      const parsed = JSON.parse(raw);
+      return { name: "Membros", logoUrl: "", primaryColor: "#8b5cf6", ...parsed.general };
+    } catch {
+      return { name: "Membros", logoUrl: "", primaryColor: "#8b5cf6" };
+    }
+  }, []);
+
   const onSignOut = async () => {
     await signOut();
     navigate({ to: "/login" });
@@ -57,15 +74,16 @@ export function AppShell() {
       >
         <div className="h-full flex flex-col p-5">
           <Link to="/dashboard" className="flex items-center gap-3 px-2 py-2 mb-8">
-            <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center shadow-[0_0_24px_-4px_oklch(0.65_0.22_290/0.6)]">
-              <Sparkles className="h-5 w-5 text-primary-foreground" />
-            </div>
+            {siteSettings.logoUrl ? (
+              <img src={siteSettings.logoUrl} alt={siteSettings.name} className="h-10 w-10 rounded-xl object-cover shadow-[0_0_24px_-4px_oklch(0.65_0.22_290/0.6)]" />
+            ) : (
+              <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center shadow-[0_0_24px_-4px_oklch(0.65_0.22_290/0.6)]">
+                <Sparkles className="h-5 w-5 text-primary-foreground" />
+              </div>
+            )}
             <div>
-              <div className="font-semibold text-sm leading-none flex items-center gap-2">
-                Membros
-                <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/20">
-                  HUB
-                </span>
+              <div className="font-semibold text-sm leading-none">
+                {siteSettings.name}
               </div>
               <div className="text-[10px] text-muted-foreground mt-1.5">área exclusiva</div>
             </div>
@@ -157,7 +175,7 @@ export function AppShell() {
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="hidden md:flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">Membros</span>
+            <span className="text-muted-foreground">{siteSettings.name}</span>
             <span className="text-muted-foreground/40">/</span>
             <span className="text-foreground font-medium">{current}</span>
           </div>
@@ -166,17 +184,13 @@ export function AppShell() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <input
                 placeholder="Buscar conteúdos..."
+                name="member-search"
+                autoComplete="off"
                 className="w-full bg-white/[0.03] border border-white/10 rounded-full pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white/[0.05] transition"
               />
             </div>
           </div>
-          <button
-            className="relative p-2 rounded-xl hover:bg-white/5 transition"
-            aria-label="Notificações"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
-          </button>
+          <NotificationBell />
           <div className="h-9 w-9 rounded-full gradient-primary flex items-center justify-center text-xs font-semibold text-primary-foreground">
             {initials}
           </div>

@@ -247,6 +247,222 @@ export type Database = {
           },
         ]
       }
+      lesson_video_progress: {
+        Row: {
+          current_time: number
+          duration: number | null
+          lesson_id: string
+          playback_rate: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          current_time?: number
+          duration?: number | null
+          lesson_id: string
+          playback_rate?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          current_time?: number
+          duration?: number | null
+          lesson_id?: string
+          playback_rate?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_video_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_attachments: {
+        Row: {
+          id: string
+          lesson_id: string
+          file_name: string
+          file_path: string
+          file_size: number
+          mime_type: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          lesson_id: string
+          file_name: string
+          file_path: string
+          file_size?: number
+          mime_type?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          lesson_id?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          mime_type?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_attachments_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_bookmarks: {
+        Row: {
+          id: string
+          user_id: string
+          lesson_id: string
+          time_seconds: number
+          label: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          lesson_id: string
+          time_seconds: number
+          label?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          lesson_id?: string
+          time_seconds?: number
+          label?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_bookmarks_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_comments: {
+        Row: {
+          id: string
+          lesson_id: string
+          user_id: string
+          parent_id: string | null
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          lesson_id: string
+          user_id: string
+          parent_id?: string | null
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          lesson_id?: string
+          user_id?: string
+          parent_id?: string | null
+          content?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_comments_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_settings: {
+        Row: {
+          id: string
+          accent_color: string
+          controls_bg: string
+          progress_color: string
+          logo_url: string | null
+          watermark_enabled: boolean
+          watermark_text: string | null
+          watermark_position: string
+          watermark_opacity: number
+          block_right_click: boolean
+          block_download: boolean
+          block_devtools: boolean
+          speed_control: boolean
+          bookmarks_enabled: boolean
+          notes_enabled: boolean
+          autoplay_next: boolean
+          resume_playback: boolean
+          updated_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          accent_color?: string
+          controls_bg?: string
+          progress_color?: string
+          logo_url?: string | null
+          watermark_enabled?: boolean
+          watermark_text?: string | null
+          watermark_position?: string
+          watermark_opacity?: number
+          block_right_click?: boolean
+          block_download?: boolean
+          block_devtools?: boolean
+          speed_control?: boolean
+          bookmarks_enabled?: boolean
+          notes_enabled?: boolean
+          autoplay_next?: boolean
+          resume_playback?: boolean
+          updated_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          accent_color?: string
+          controls_bg?: string
+          progress_color?: string
+          logo_url?: string | null
+          watermark_enabled?: boolean
+          watermark_text?: string | null
+          watermark_position?: string
+          watermark_opacity?: number
+          block_right_click?: boolean
+          block_download?: boolean
+          block_devtools?: boolean
+          speed_control?: boolean
+          bookmarks_enabled?: boolean
+          notes_enabled?: boolean
+          autoplay_next?: boolean
+          resume_playback?: boolean
+          updated_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       lessons: {
         Row: {
           content: string | null

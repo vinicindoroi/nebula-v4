@@ -1,8 +1,9 @@
 import { Link, useRouterState, Outlet, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Users, BookOpen, Layers, FolderTree, MessageSquare,
-  CreditCard, Ticket, Bell, Settings, ScrollText, Search, Menu, X, LogOut, Shield, ArrowLeft,
+  LayoutDashboard, Users, BookOpen, Layers, FolderTree, MessageSquare, MessagesSquare,
+  CreditCard, Ticket, Bell, Settings, ScrollText, Search, Menu, X, LogOut, Shield, ArrowLeft, Play, Crown,
 } from "lucide-react";
+import { NotificationBell } from "@/components/members/NotificationBell";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -22,6 +23,8 @@ const navGroups: NavGroup[] = [
       { to: "/admin/courses", label: "Cursos", icon: BookOpen },
       { to: "/admin/modules", label: "Módulos & Aulas", icon: Layers },
       { to: "/admin/categories", label: "Categorias", icon: FolderTree },
+      { to: "/admin/player", label: "Player", icon: Play },
+      { to: "/admin/community", label: "Comunidade", icon: MessagesSquare },
       { to: "/admin/comments", label: "Comentários", icon: MessageSquare },
     ],
   },
@@ -29,6 +32,7 @@ const navGroups: NavGroup[] = [
     label: "Comercial",
     items: [
       { to: "/admin/members", label: "Membros", icon: Users },
+      { to: "/admin/offers", label: "Ofertas", icon: Crown },
       { to: "/admin/sales", label: "Vendas", icon: CreditCard },
       { to: "/admin/coupons", label: "Cupons", icon: Ticket },
     ],
@@ -162,13 +166,7 @@ export function AdminShell() {
               />
             </div>
           </div>
-          <button
-            className="relative p-2 rounded-xl hover:bg-white/5 transition"
-            aria-label="Notificações"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
-          </button>
+          <NotificationBell />
           <Link
             to="/dashboard"
             className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground border border-white/10 hover:border-white/20 bg-white/[0.03] hover:bg-white/[0.06] transition"

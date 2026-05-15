@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Search, Trash2, Edit3, Download, Plus, MoreVertical, Shield, Pause, Play } from "lucide-react";
+import { Search, Trash2, Edit3, Download, Plus, MoreVertical, Shield, Pause, Play, UserPlus, Mail, User, FileText, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Modal, Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
 
 export const Route = createFileRoute("/admin/members")({ component: Page });
 
@@ -15,6 +16,7 @@ function Page() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
   const [editing, setEditing] = useState<Member | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -64,7 +66,7 @@ function Page() {
         </div>
         <div className="flex gap-2">
           <button onClick={exportCsv} className="glass px-3.5 py-2 rounded-xl text-sm flex items-center gap-2 hover:bg-white/10"><Download className="h-4 w-4" />CSV</button>
-          <button className="gradient-primary text-primary-foreground px-3.5 py-2 rounded-xl text-sm flex items-center gap-2"><Plus className="h-4 w-4" />Adicionar</button>
+          <button onClick={() => setAdding(true)} className="gradient-primary text-primary-foreground px-3.5 py-2 rounded-xl text-sm flex items-center gap-2"><Plus className="h-4 w-4" />Adicionar</button>
         </div>
       </div>
 
@@ -130,6 +132,7 @@ function Page() {
       </div>
 
       {editing && <EditModal member={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {adding && <AddMemberModal onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} />}
     </div>
   );
 }
@@ -146,29 +149,179 @@ function EditModal({ member, onClose, onSaved }: { member: Member; onClose: () =
     onSaved();
   };
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-md animate-in fade-in" onClick={onClose}>
-      <div className="min-h-full flex items-center justify-center p-4">
-        <div className="glass-strong rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold mb-4">Editar membro</h2>
-        <div className="space-y-3">
-          <Field label="Nome"><input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" /></Field>
-          <Field label="Plano">
-            <select value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
-              <option>Free</option><option>Pro</option><option>Premium</option>
-            </select>
-          </Field>
-          <Field label="Bio"><textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" /></Field>
-        </div>
-        <div className="flex justify-end gap-2 mt-5">
+    <Modal
+      open
+      onClose={onClose}
+      title="Editar membro"
+      kicker="Edição"
+      size="md"
+      footer={
+        <>
           <button onClick={onClose} className="px-3.5 py-2 rounded-xl text-sm hover:bg-white/5">Cancelar</button>
           <button onClick={save} disabled={saving} className="gradient-primary text-primary-foreground px-3.5 py-2 rounded-xl text-sm disabled:opacity-50">{saving ? "Salvando..." : "Salvar"}</button>
-        </div>
-        </div>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Nome" icon={User} required>
+          <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={inputClass} />
+        </Field>
+        <Field label="Plano" icon={Shield}>
+          <select value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })} className={selectClass} style={selectStyle}>
+            <option>Free</option><option>Pro</option><option>Premium</option>
+          </select>
+        </Field>
+        <Field label="Bio" icon={FileText}>
+          <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className={inputClass} />
+        </Field>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="text-xs text-muted-foreground mb-1.5 block">{label}</label>{children}</div>;
+function AddMemberModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [mode, setMode] = useState<"manual" | "invite">("manual");
+  const [form, setForm] = useState({ full_name: "", email: "", plan: "Free", bio: "", status: "active" });
+  const [saving, setSaving] = useState(false);
+
+  const saveManual = async () => {
+    if (!form.full_name.trim()) return toast.error("Nome é obrigatório");
+
+    setSaving(true);
+    const { error } = await supabase.from("profiles").insert({
+      full_name: form.full_name.trim(),
+      plan: form.plan,
+      bio: form.bio.trim() || null,
+      status: form.status,
+    });
+    setSaving(false);
+
+    if (error) return toast.error(error.message);
+    toast.success("Membro adicionado com sucesso");
+    onSaved();
+  };
+
+  const sendInvite = async () => {
+    if (!form.email.trim()) return toast.error("Email é obrigatório");
+    if (!form.full_name.trim()) return toast.error("Nome é obrigatório");
+
+    setSaving(true);
+    const { data, error } = await supabase.auth.signUp({
+      email: form.email.trim(),
+      password: crypto.randomUUID(),
+      options: {
+        data: { full_name: form.full_name.trim() },
+      },
+    });
+    setSaving(false);
+
+    if (error) return toast.error(error.message);
+
+    // Update the profile with plan/status/bio if user was created
+    if (data.user) {
+      await supabase.from("profiles").update({
+        plan: form.plan,
+        status: form.status,
+        bio: form.bio.trim() || null,
+      }).eq("id", data.user.id);
+    }
+
+    toast.success("Membro criado! Um email de confirmação foi enviado.");
+    onSaved();
+  };
+
+  const handleSave = () => (mode === "invite" ? sendInvite() : saveManual());
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Adicionar membro"
+      kicker="Novo membro"
+      description="Escolha como deseja adicionar o membro à plataforma."
+      size="md"
+      footer={
+        <>
+          <button onClick={onClose} className="px-3.5 py-2 rounded-xl text-sm hover:bg-white/5">Cancelar</button>
+          <button onClick={handleSave} disabled={saving} className="gradient-primary text-primary-foreground px-3.5 py-2 rounded-xl text-sm disabled:opacity-50">
+            {saving ? "Salvando..." : mode === "invite" ? "Enviar convite" : "Adicionar"}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10">
+          <button
+            onClick={() => setMode("manual")}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${mode === "manual" ? "bg-white/10 text-white" : "text-muted-foreground hover:text-white"}`}
+          >
+            Cadastro manual
+          </button>
+          <button
+            onClick={() => setMode("invite")}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${mode === "invite" ? "bg-white/10 text-white" : "text-muted-foreground hover:text-white"}`}
+          >
+            Convite por email
+          </button>
+        </div>
+
+        <Field label="Nome completo" icon={User} required>
+          <input
+            value={form.full_name}
+            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+            placeholder="Ex: João Silva"
+            className={inputClass}
+          />
+        </Field>
+
+        {mode === "invite" && (
+          <Field label="Email" icon={Mail} required hint="Um convite será enviado para este email.">
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="joao@email.com"
+              className={inputClass}
+            />
+          </Field>
+        )}
+
+        <Field label="Plano" icon={Shield}>
+          <select
+            value={form.plan}
+            onChange={(e) => setForm({ ...form, plan: e.target.value })}
+            className={selectClass}
+            style={selectStyle}
+          >
+            <option value="Free">Free</option>
+            <option value="Pro">Pro</option>
+            <option value="Premium">Premium</option>
+          </select>
+        </Field>
+
+        <Field label="Status" icon={Activity}>
+          <select
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+            className={selectClass}
+            style={selectStyle}
+          >
+            <option value="active">Ativo</option>
+            <option value="pending">Pendente</option>
+            <option value="suspended">Suspenso</option>
+          </select>
+        </Field>
+
+        <Field label="Bio" icon={FileText} hint="Opcional. Uma breve descrição sobre o membro.">
+          <textarea
+            value={form.bio}
+            onChange={(e) => setForm({ ...form, bio: e.target.value })}
+            rows={3}
+            placeholder="Conte um pouco sobre este membro..."
+            className={inputClass}
+          />
+        </Field>
+      </div>
+    </Modal>
+  );
 }

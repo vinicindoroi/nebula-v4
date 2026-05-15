@@ -16,6 +16,8 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSalesRouteImport } from './routes/admin.sales'
+import { Route as AdminPlayerRouteImport } from './routes/admin.player'
+import { Route as AdminOffersRouteImport } from './routes/admin.offers'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminModulesRouteImport } from './routes/admin.modules'
 import { Route as AdminMembersRouteImport } from './routes/admin.members'
@@ -23,10 +25,13 @@ import { Route as AdminLogsRouteImport } from './routes/admin.logs'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCoursesRouteImport } from './routes/admin.courses'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
+import { Route as AdminCommunityRouteImport } from './routes/admin.community'
 import { Route as AdminCommentsRouteImport } from './routes/admin.comments'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppSavedRouteImport } from './routes/_app.saved'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
+import { Route as AppForumRouteImport } from './routes/_app.forum'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCoursesRouteImport } from './routes/_app.courses'
 import { Route as AppCommunityRouteImport } from './routes/_app.community'
@@ -66,6 +71,16 @@ const AdminSalesRoute = AdminSalesRouteImport.update({
   path: '/sales',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPlayerRoute = AdminPlayerRouteImport.update({
+  id: '/player',
+  path: '/player',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOffersRoute = AdminOffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
@@ -101,6 +116,11 @@ const AdminCouponsRoute = AdminCouponsRouteImport.update({
   path: '/coupons',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCommunityRoute = AdminCommunityRouteImport.update({
+  id: '/community',
+  path: '/community',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCommentsRoute = AdminCommentsRouteImport.update({
   id: '/comments',
   path: '/comments',
@@ -116,9 +136,19 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSavedRoute = AppSavedRouteImport.update({
+  id: '/saved',
+  path: '/saved',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppForumRoute = AppForumRouteImport.update({
+  id: '/forum',
+  path: '/forum',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -150,10 +180,13 @@ export interface FileRoutesByFullPath {
   '/community': typeof AppCommunityRoute
   '/courses': typeof AppCoursesRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
+  '/forum': typeof AppForumRoute
   '/profile': typeof AppProfileRoute
+  '/saved': typeof AppSavedRoute
   '/settings': typeof AppSettingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/community': typeof AdminCommunityRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -161,6 +194,8 @@ export interface FileRoutesByFullPath {
   '/admin/members': typeof AdminMembersRoute
   '/admin/modules': typeof AdminModulesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/offers': typeof AdminOffersRoute
+  '/admin/player': typeof AdminPlayerRoute
   '/admin/sales': typeof AdminSalesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/courses/$courseId': typeof AppCoursesCourseIdRoute
@@ -173,10 +208,13 @@ export interface FileRoutesByTo {
   '/community': typeof AppCommunityRoute
   '/courses': typeof AppCoursesRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
+  '/forum': typeof AppForumRoute
   '/profile': typeof AppProfileRoute
+  '/saved': typeof AppSavedRoute
   '/settings': typeof AppSettingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/community': typeof AdminCommunityRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -184,6 +222,8 @@ export interface FileRoutesByTo {
   '/admin/members': typeof AdminMembersRoute
   '/admin/modules': typeof AdminModulesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/offers': typeof AdminOffersRoute
+  '/admin/player': typeof AdminPlayerRoute
   '/admin/sales': typeof AdminSalesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/courses/$courseId': typeof AppCoursesCourseIdRoute
@@ -198,10 +238,13 @@ export interface FileRoutesById {
   '/_app/community': typeof AppCommunityRoute
   '/_app/courses': typeof AppCoursesRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/forum': typeof AppForumRoute
   '/_app/profile': typeof AppProfileRoute
+  '/_app/saved': typeof AppSavedRoute
   '/_app/settings': typeof AppSettingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/community': typeof AdminCommunityRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -209,6 +252,8 @@ export interface FileRoutesById {
   '/admin/members': typeof AdminMembersRoute
   '/admin/modules': typeof AdminModulesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/offers': typeof AdminOffersRoute
+  '/admin/player': typeof AdminPlayerRoute
   '/admin/sales': typeof AdminSalesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/_app/courses/$courseId': typeof AppCoursesCourseIdRoute
@@ -223,10 +268,13 @@ export interface FileRouteTypes {
     | '/community'
     | '/courses'
     | '/dashboard'
+    | '/forum'
     | '/profile'
+    | '/saved'
     | '/settings'
     | '/admin/categories'
     | '/admin/comments'
+    | '/admin/community'
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
@@ -234,6 +282,8 @@ export interface FileRouteTypes {
     | '/admin/members'
     | '/admin/modules'
     | '/admin/notifications'
+    | '/admin/offers'
+    | '/admin/player'
     | '/admin/sales'
     | '/admin/settings'
     | '/courses/$courseId'
@@ -246,10 +296,13 @@ export interface FileRouteTypes {
     | '/community'
     | '/courses'
     | '/dashboard'
+    | '/forum'
     | '/profile'
+    | '/saved'
     | '/settings'
     | '/admin/categories'
     | '/admin/comments'
+    | '/admin/community'
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
@@ -257,6 +310,8 @@ export interface FileRouteTypes {
     | '/admin/members'
     | '/admin/modules'
     | '/admin/notifications'
+    | '/admin/offers'
+    | '/admin/player'
     | '/admin/sales'
     | '/admin/settings'
     | '/courses/$courseId'
@@ -270,10 +325,13 @@ export interface FileRouteTypes {
     | '/_app/community'
     | '/_app/courses'
     | '/_app/dashboard'
+    | '/_app/forum'
     | '/_app/profile'
+    | '/_app/saved'
     | '/_app/settings'
     | '/admin/categories'
     | '/admin/comments'
+    | '/admin/community'
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
@@ -281,6 +339,8 @@ export interface FileRouteTypes {
     | '/admin/members'
     | '/admin/modules'
     | '/admin/notifications'
+    | '/admin/offers'
+    | '/admin/player'
     | '/admin/sales'
     | '/admin/settings'
     | '/_app/courses/$courseId'
@@ -345,6 +405,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSalesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/player': {
+      id: '/admin/player'
+      path: '/player'
+      fullPath: '/admin/player'
+      preLoaderRoute: typeof AdminPlayerRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/offers': {
+      id: '/admin/offers'
+      path: '/offers'
+      fullPath: '/admin/offers'
+      preLoaderRoute: typeof AdminOffersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/notifications': {
       id: '/admin/notifications'
       path: '/notifications'
@@ -394,6 +468,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCouponsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/community': {
+      id: '/admin/community'
+      path: '/community'
+      fullPath: '/admin/community'
+      preLoaderRoute: typeof AdminCommunityRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/comments': {
       id: '/admin/comments'
       path: '/comments'
@@ -415,11 +496,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/saved': {
+      id: '/_app/saved'
+      path: '/saved'
+      fullPath: '/saved'
+      preLoaderRoute: typeof AppSavedRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/profile': {
       id: '/_app/profile'
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/forum': {
+      id: '/_app/forum'
+      path: '/forum'
+      fullPath: '/forum'
+      preLoaderRoute: typeof AppForumRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dashboard': {
@@ -469,7 +564,9 @@ interface AppRouteChildren {
   AppCommunityRoute: typeof AppCommunityRoute
   AppCoursesRoute: typeof AppCoursesRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
+  AppForumRoute: typeof AppForumRoute
   AppProfileRoute: typeof AppProfileRoute
+  AppSavedRoute: typeof AppSavedRoute
   AppSettingsRoute: typeof AppSettingsRoute
 }
 
@@ -477,7 +574,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppCommunityRoute: AppCommunityRoute,
   AppCoursesRoute: AppCoursesRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
+  AppForumRoute: AppForumRoute,
   AppProfileRoute: AppProfileRoute,
+  AppSavedRoute: AppSavedRoute,
   AppSettingsRoute: AppSettingsRoute,
 }
 
@@ -486,6 +585,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminCommentsRoute: typeof AdminCommentsRoute
+  AdminCommunityRoute: typeof AdminCommunityRoute
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminCoursesRoute: typeof AdminCoursesRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
@@ -493,6 +593,8 @@ interface AdminRouteChildren {
   AdminMembersRoute: typeof AdminMembersRoute
   AdminModulesRoute: typeof AdminModulesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminOffersRoute: typeof AdminOffersRoute
+  AdminPlayerRoute: typeof AdminPlayerRoute
   AdminSalesRoute: typeof AdminSalesRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
 }
@@ -500,6 +602,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminCommentsRoute: AdminCommentsRoute,
+  AdminCommunityRoute: AdminCommunityRoute,
   AdminCouponsRoute: AdminCouponsRoute,
   AdminCoursesRoute: AdminCoursesRoute,
   AdminDashboardRoute: AdminDashboardRoute,
@@ -507,6 +610,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminMembersRoute: AdminMembersRoute,
   AdminModulesRoute: AdminModulesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminOffersRoute: AdminOffersRoute,
+  AdminPlayerRoute: AdminPlayerRoute,
   AdminSalesRoute: AdminSalesRoute,
   AdminSettingsRoute: AdminSettingsRoute,
 }

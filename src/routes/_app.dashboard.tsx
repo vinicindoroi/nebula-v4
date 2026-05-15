@@ -120,7 +120,11 @@ function Dashboard() {
                 params={{ courseId: c.id }}
                 className="rounded-2xl border border-white/5 bg-white/[0.02] overflow-hidden hover:border-white/10 transition group"
               >
-                <div className="aspect-[16/9] gradient-primary relative">
+                <div className="aspect-[16/9] relative overflow-hidden">
+                  {c.cover_url && (
+                    <img src={c.cover_url} alt={c.title} className="absolute inset-0 w-full h-full object-cover" />
+                  )}
+                  <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${c.gradient_from || "#6366f1"}, ${(c.gradient_to || "#8b5cf6")}00)` }} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   {c.tag && (
                     <span className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-[10px] uppercase tracking-wider px-2 py-1 rounded-md font-medium">

@@ -10,42 +10,109 @@ export const Route = createFileRoute("/admin/dashboard")({ component: Page });
 const COLORS = ["#8b5cf6", "#06b6d4", "#f59e0b", "#10b981"];
 
 function Page() {
-  const [stats, setStats] = useState({ members: 0, revenue: 0, newUsers: 0, retention: 87.4 });
+  const [stats, setStats] = useState({ members: 0, revenue: 0, newUsers: 0, retention: 0 });
   const [growth, setGrowth] = useState<Array<{ d: string; v: number }>>([]);
   const [revenue, setRevenue] = useState<Array<{ m: string; v: number }>>([]);
   const [plans, setPlans] = useState<Array<{ name: string; value: number }>>([]);
   const [activity, setActivity] = useState<any[]>([]);
-  const [topCourses, setTopCourses] = useState<any[]>([]);
+  const [topCourses, setTopCourses] = useState<Array<{ id: string; title: string; views: number }>>([]);
 
   useEffect(() => {
     (async () => {
-      const [{ count: members }, { data: tx }, { count: news }, { data: courses }, { data: logs }] = await Promise.all([
-        supabase.from("profiles").select("*", { count: "exact", head: true }),
-        supabase.from("transactions").select("amount,plan,created_at").gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString()),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
-        supabase.from("courses").select("id,title").limit(5),
-        supabase.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(8),
-      ]);
-      const rev = (tx ?? []).reduce((a, t: any) => a + Number(t.amount), 0);
-      setStats({ members: members ?? 0, revenue: rev, newUsers: news ?? 0, retention: 87.4 });
+      const db = supabase as any;
 
-      const days = Array.from({ length: 30 }).map((_, i) => {
-        const d = new Date(Date.now() - (29 - i) * 86400000);
-        return { d: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), v: Math.round(50 + Math.sin(i / 3) * 12 + i * 2) };
-      });
+      const [
+        { count: members },
+        { data: tx },
+        { count: news },
+        { data: profiles },
+        { data: logs },
+        { data: lessonProgress },
+        { data: courses },
+      ] = await Promise.all([
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        db.from("transactions").select("amount,plan,created_at"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+        supabase.from("profiles").select("id,plan,created_at"),
+        db.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(8),
+        db.from("lesson_progress").select("lesson_id,created_at,lessons(course_id,courses(id,title))"),
+        supabase.from("courses").select("id,title"),
+      ]);
+
+      // Revenue this month
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const monthTx = (tx ?? []).filter((t: any) => t.created_at >= monthStart);
+      const rev = monthTx.reduce((a: number, t: any) => a + Number(t.amount || 0), 0);
+
+      // Retention: users who signed up > 30 days ago and have activity in last 30 days
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+      const oldUsers = (profiles ?? []).filter((p: any) => p.created_at < thirtyDaysAgo);
+      const activeUserIds = new Set((lessonProgress ?? []).filter((lp: any) => lp.created_at >= thirtyDaysAgo).map((lp: any) => lp.lesson_id));
+      // Simplified: retention = (users with any progress / total users) * 100
+      const usersWithProgress = new Set((lessonProgress ?? []).map((lp: any) => lp.lesson_id));
+      const retention = (members && members > 0) ? Math.round((usersWithProgress.size / members) * 100 * 10) / 10 : 0;
+
+      setStats({ members: members ?? 0, revenue: rev, newUsers: news ?? 0, retention });
+
+      // Growth: real signups per day over last 30 days
+      const days: Array<{ d: string; v: number }> = [];
+      for (let i = 29; i >= 0; i--) {
+        const dayStart = new Date(Date.now() - i * 86400000);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setHours(23, 59, 59, 999);
+        const count = (profiles ?? []).filter((p: any) => {
+          const d = new Date(p.created_at);
+          return d >= dayStart && d <= dayEnd;
+        }).length;
+        // Cumulative count up to this day
+        const cumulative = (profiles ?? []).filter((p: any) => new Date(p.created_at) <= dayEnd).length;
+        days.push({ d: dayStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), v: cumulative });
+      }
       setGrowth(days);
 
-      const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
-      setRevenue(months.map((m, i) => ({ m, v: Math.round(8000 + i * 1200 + Math.random() * 2500) })));
+      // Revenue per month (last 6 months)
+      const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      const revenueByMonth: Array<{ m: string; v: number }> = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+        const mTx = (tx ?? []).filter((t: any) => {
+          const td = new Date(t.created_at);
+          return td >= d && td <= mEnd;
+        });
+        const mRev = mTx.reduce((a: number, t: any) => a + Number(t.amount || 0), 0);
+        revenueByMonth.push({ m: monthNames[d.getMonth()], v: mRev });
+      }
+      setRevenue(revenueByMonth);
 
+      // Plan distribution from profiles
       const planCounts: Record<string, number> = {};
-      (tx ?? []).forEach((t: any) => { planCounts[t.plan] = (planCounts[t.plan] ?? 0) + 1; });
+      (profiles ?? []).forEach((p: any) => {
+        const plan = p.plan || "Free";
+        planCounts[plan] = (planCounts[plan] ?? 0) + 1;
+      });
       const plansArr = Object.entries(planCounts).map(([name, value]) => ({ name, value }));
-      setPlans(plansArr.length ? plansArr : [
-        { name: "Free", value: 60 }, { name: "Pro", value: 30 }, { name: "Premium", value: 10 },
-      ]);
+      setPlans(plansArr.length ? plansArr : [{ name: "Free", value: members ?? 0 }]);
+
+      // Activity logs
       setActivity(logs ?? []);
-      setTopCourses(courses ?? []);
+
+      // Top courses by lesson_progress count
+      const courseCounts: Record<string, { title: string; count: number }> = {};
+      (courses ?? []).forEach((c: any) => { courseCounts[c.id] = { title: c.title, count: 0 }; });
+      (lessonProgress ?? []).forEach((lp: any) => {
+        const courseId = lp.lessons?.course_id || lp.lessons?.courses?.id;
+        if (courseId && courseCounts[courseId]) {
+          courseCounts[courseId].count++;
+        }
+      });
+      const sorted = Object.entries(courseCounts)
+        .map(([id, { title, count }]) => ({ id, title, views: count }))
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 5);
+      setTopCourses(sorted);
     })();
   }, []);
 
@@ -114,7 +181,7 @@ function Page() {
             {topCourses.map((c, i) => (
               <div key={c.id} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3 min-w-0"><span className="text-muted-foreground text-xs w-4">{i + 1}</span><span className="truncate">{c.title}</span></div>
-                <span className="text-xs text-muted-foreground">{Math.round(Math.random() * 500 + 100)}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{c.views}</span>
               </div>
             ))}
             {!topCourses.length && <div className="text-xs text-muted-foreground">Sem cursos ainda</div>}

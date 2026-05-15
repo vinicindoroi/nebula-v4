@@ -1,26 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Edit3, Trash2, BookOpen, X, ImageIcon, Tag as TagIcon, DollarSign, FileText, Folder, Eye } from "lucide-react";
+import { Plus, Edit3, Trash2, BookOpen, X, ImageIcon, Tag as TagIcon, DollarSign, FileText, Folder, Eye, Palette, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/courses")({ component: Page });
 
-type Course = { id: string; title: string; description: string | null; tag: string | null; cover_url: string | null; status: string; price: number | null; category_id: string | null };
+type Course = { id: string; title: string; description: string | null; tag: string | null; cover_url: string | null; status: string; price: number | null; category_id: string | null; gradient_from: string | null; gradient_to: string | null; is_premium: boolean | null; offer_id: string | null; access_level: string | null };
 type Cat = { id: string; name: string };
+type Offer = { id: string; name: string };
 
 function Page() {
   const [rows, setRows] = useState<Course[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [editing, setEditing] = useState<Partial<Course> | null>(null);
 
   const load = async () => {
-    const [{ data: c }, { data: ct }] = await Promise.all([
+    const [{ data: c }, { data: ct }, { data: of }] = await Promise.all([
       supabase.from("courses").select("*").order("created_at", { ascending: false }),
       supabase.from("categories").select("id,name"),
+      supabase.from("offers").select("id,name").eq("active", true),
     ]);
-    setRows((c ?? []) as any); setCats((ct ?? []) as any);
+    setRows((c ?? []) as any); setCats((ct ?? []) as any); setOffers((of ?? []) as Offer[]);
   };
   useEffect(() => { load(); }, []);
 
@@ -39,39 +42,67 @@ function Page() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {rows.map((c) => (
-          <div key={c.id} className="glass rounded-2xl p-5 hover:bg-white/[0.07] transition group">
-            <div className="aspect-video rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 mb-4 flex items-center justify-center">
-              {c.cover_url ? <img src={c.cover_url} className="w-full h-full object-cover rounded-xl" /> : <BookOpen className="h-8 w-8 text-primary/60" />}
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${c.status === "published" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>{c.status}</span>
-              {c.tag && <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-muted-foreground">{c.tag}</span>}
-            </div>
-            <h3 className="font-medium leading-tight mb-1">{c.title}</h3>
-            <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{c.description}</p>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">R$ {Number(c.price ?? 0).toFixed(2)}</span>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                <button onClick={() => setEditing(c)} className="p-1.5 rounded-lg hover:bg-white/10"><Edit3 className="h-3.5 w-3.5" /></button>
-                <button onClick={() => remove(c.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+        {rows.map((c) => {
+          const gFrom = c.gradient_from || "#6366f1";
+          const gTo = c.gradient_to || "#8b5cf6";
+          const catName = cats.find((cat) => cat.id === c.category_id)?.name;
+          return (
+            <div key={c.id} className="glass rounded-2xl overflow-hidden hover:bg-white/[0.07] transition group">
+              <div className="relative aspect-video">
+                {c.cover_url && (
+                  <img src={c.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                )}
+                <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${gFrom}, ${gTo}00)` }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+                  {catName && (
+                    <span className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white/90 mb-2 font-medium">{catName}</span>
+                  )}
+                  <h3 className="text-white font-semibold text-base leading-tight drop-shadow-lg">{c.title}</h3>
+                  {c.description && <p className="text-white/70 text-xs mt-1 line-clamp-2 max-w-[85%]">{c.description}</p>}
+                </div>
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                  <button onClick={() => setEditing(c)} className="p-1.5 rounded-lg bg-black/50 backdrop-blur-sm hover:bg-black/70 text-white"><Edit3 className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => remove(c.id)} className="p-1.5 rounded-lg bg-black/50 backdrop-blur-sm hover:bg-red-500/80 text-white"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${c.status === "published" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>{c.status}</span>
+                  {c.tag && <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-muted-foreground">{c.tag}</span>}
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-muted-foreground">R$ {Number(c.price ?? 0).toFixed(2)}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {rows.length === 0 && <div className="glass rounded-2xl p-12 text-center text-sm text-muted-foreground col-span-full">Nenhum curso. Clique em "Novo curso".</div>}
       </div>
 
-      {editing && <CourseModal initial={editing} cats={cats} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <CourseModal initial={editing} cats={cats} offers={offers} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </div>
   );
 }
 
-function CourseModal({ initial, cats, onClose, onSaved }: { initial: Partial<Course>; cats: Cat[]; onClose: () => void; onSaved: () => void }) {
+function toHex(color: string): string {
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+  try {
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    ctx.fillStyle = color;
+    return ctx.fillStyle;
+  } catch {
+    return "#000000";
+  }
+}
+
+function CourseModal({ initial, cats, offers, onClose, onSaved }: { initial: Partial<Course>; cats: Cat[]; offers: Offer[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({
     title: initial.title ?? "", description: initial.description ?? "", tag: initial.tag ?? "",
     status: initial.status ?? "draft", price: Number(initial.price ?? 0), category_id: initial.category_id ?? "",
-    cover_url: initial.cover_url ?? "",
+    cover_url: initial.cover_url ?? "", gradient_from: initial.gradient_from ?? "#6366f1", gradient_to: initial.gradient_to ?? "#8b5cf6",
+    is_premium: initial.is_premium ?? false, offer_id: initial.offer_id ?? "", access_level: (initial as any).access_level ?? "free",
   });
   const [saving, setSaving] = useState(false);
 
@@ -86,7 +117,7 @@ function CourseModal({ initial, cats, onClose, onSaved }: { initial: Partial<Cou
   const save = async () => {
     if (!f.title.trim()) return toast.error("Informe um título");
     setSaving(true);
-    const payload: any = { ...f, category_id: f.category_id || null };
+    const payload: any = { ...f, category_id: f.category_id || null, offer_id: f.offer_id || null, access_level: f.access_level };
     const { error } = initial.id
       ? await supabase.from("courses").update(payload).eq("id", initial.id)
       : await supabase.from("courses").insert(payload);
@@ -183,6 +214,16 @@ function CourseModal({ initial, cats, onClose, onSaved }: { initial: Partial<Cou
               </Field>
             </div>
 
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+              <Field label="Acesso" icon={Crown} hint="Plano mínimo para acessar este curso">
+                <select value={f.access_level} onChange={(e) => { const v = e.target.value; setF({ ...f, access_level: v, is_premium: v !== "free" }); }} className="modal-inp">
+                  <option value="free">Free — Todos os membros</option>
+                  <option value="pro">Pro</option>
+                  <option value="premium">Premium</option>
+                </select>
+              </Field>
+            </div>
+
             <Field label="URL da capa" icon={ImageIcon}>
               <input
                 value={f.cover_url}
@@ -195,12 +236,94 @@ function CourseModal({ initial, cats, onClose, onSaved }: { initial: Partial<Cou
                 <span>Mobile: <span className="text-foreground">750 × 422 px</span> (16:9, 2x)</span>
                 <span>Máx. 1 MB · JPG ou WebP</span>
               </div>
-              {f.cover_url && (
-                <div className="mt-2 aspect-video w-full rounded-xl overflow-hidden border border-white/10 bg-white/[0.02]">
-                  <img src={f.cover_url} alt="" className="w-full h-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
-                </div>
-              )}
             </Field>
+
+            <Field label="Cores do degradê" icon={Palette}>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-1">
+                  <label className="text-[11px] text-muted-foreground whitespace-nowrap">De:</label>
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="color"
+                      value={toHex(f.gradient_from)}
+                      onChange={(e) => setF({ ...f, gradient_from: e.target.value })}
+                      className="h-9 w-9 rounded-lg border border-white/10 cursor-pointer bg-transparent shrink-0"
+                    />
+                    <input
+                      type="text"
+                      value={f.gradient_from}
+                      onChange={(e) => setF({ ...f, gradient_from: e.target.value })}
+                      placeholder="#6366f1 ou red"
+                      className="modal-inp flex-1 font-mono text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <label className="text-[11px] text-muted-foreground whitespace-nowrap">Até:</label>
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="color"
+                      value={toHex(f.gradient_to)}
+                      onChange={(e) => setF({ ...f, gradient_to: e.target.value })}
+                      className="h-9 w-9 rounded-lg border border-white/10 cursor-pointer bg-transparent shrink-0"
+                    />
+                    <input
+                      type="text"
+                      value={f.gradient_to}
+                      onChange={(e) => setF({ ...f, gradient_to: e.target.value })}
+                      placeholder="#8b5cf6 ou blue"
+                      className="modal-inp flex-1 font-mono text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2 flex-wrap">
+                {[
+                  ["#6366f1", "#8b5cf6"],
+                  ["#ec4899", "#f97316"],
+                  ["#06b6d4", "#3b82f6"],
+                  ["#10b981", "#059669"],
+                  ["#f59e0b", "#ef4444"],
+                  ["#8b5cf6", "#ec4899"],
+                ].map(([from, to]) => (
+                  <button
+                    key={from + to}
+                    type="button"
+                    onClick={() => setF({ ...f, gradient_from: from, gradient_to: to })}
+                    className="w-8 h-8 rounded-lg border border-white/10 hover:border-white/30 hover:scale-110 transition-all shadow-sm"
+                    style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+                    title={`${from} → ${to}`}
+                  />
+                ))}
+              </div>
+            </Field>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+                <Eye className="h-3.5 w-3.5" />
+                Preview da capa
+              </label>
+              <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-white/10">
+                {f.cover_url && (
+                  <img src={f.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+                )}
+                <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${f.gradient_from}, ${f.gradient_to}00)` }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+                  {f.category_id && (
+                    <span className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white/90 mb-2 font-medium">
+                      {cats.find((c) => c.id === f.category_id)?.name ?? "Categoria"}
+                    </span>
+                  )}
+                  <h3 className="text-white font-bold text-lg leading-tight drop-shadow-lg">
+                    {f.title || "Título do curso"}
+                  </h3>
+                  {f.description && (
+                    <p className="text-white/70 text-sm mt-1.5 line-clamp-2 max-w-[80%]">{f.description}</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="px-6 py-4 border-t border-white/5 bg-white/[0.02] flex items-center justify-between gap-3">

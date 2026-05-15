@@ -9,7 +9,9 @@
       "Bash(gh --version)",
       "Bash(gh auth *)",
       "Bash(git init *)",
-      "Bash(git branch *)"
+      "Bash(git branch *)",
+      "Bash(git commit *)",
+      "Bash(gh repo *)"
     ]
   }
 }

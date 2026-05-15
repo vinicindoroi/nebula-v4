@@ -145,8 +145,19 @@ function CoursesList() {
               params={{ courseId: c.id }}
               className="group rounded-2xl border border-white/5 bg-white/[0.02] overflow-hidden hover:border-white/10 transition"
             >
-              <div className="aspect-[16/10] gradient-primary relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+              <div className="aspect-[16/10] relative overflow-hidden">
+                {c.cover_url && (
+                  <img src={c.cover_url} alt={c.title} className="absolute inset-0 w-full h-full object-cover" />
+                )}
+                <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${c.gradient_from || "#6366f1"}, ${(c.gradient_to || "#8b5cf6")}00)` }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+                  {c.tag && (
+                    <span className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white/90 mb-2 font-medium">{c.tag}</span>
+                  )}
+                  <h3 className="text-white font-semibold text-sm leading-tight drop-shadow-lg">{c.title}</h3>
+                  {c.description && <p className="text-white/70 text-[11px] mt-1 line-clamp-2 max-w-[85%]">{c.description}</p>}
+                </div>
                 {c.tag && (
                   <span className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-[10px] uppercase tracking-wider px-2 py-1 rounded-md font-medium">
                     {c.tag}
@@ -162,9 +173,7 @@ function CoursesList() {
                 </div>
               </div>
               <div className="p-4">
-                <div className="font-medium text-sm leading-tight">{c.title}</div>
-                <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{c.description}</div>
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-1 flex items-center gap-2">
                   <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
                     <div className="h-full gradient-primary transition-all" style={{ width: `${c.progress}%` }} />
                   </div>
