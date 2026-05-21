@@ -69,6 +69,18 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Propagate Wrangler env variables to process.env so that process.env.SUPABASE_URL, etc. are populated on the server
+      if (env && typeof env === "object") {
+        for (const [key, value] of Object.entries(env)) {
+          if (typeof value === "string") {
+            process.env[key] = value;
+            if (!key.startsWith("VITE_")) {
+              process.env[`VITE_${key}`] = value;
+            }
+          }
+        }
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
