@@ -23,7 +23,7 @@ function Page() {
   const [editing, setEditing] = useState<Partial<Offer> | null>(null);
 
   const load = async () => {
-    const { data, error } = await supabase.from("offers").select("*").order("created_at", { ascending: false });
+    const { data, error } = await (supabase.from("offers" as any) as any).select("*").order("created_at", { ascending: false });
     if (error) return toast.error(error.message);
     setOffers((data ?? []) as Offer[]);
   };
@@ -32,7 +32,7 @@ function Page() {
 
   const remove = async (id: string) => {
     if (!confirm("Excluir esta oferta?")) return;
-    const { error } = await supabase.from("offers").delete().eq("id", id);
+    const { error } = await (supabase.from("offers" as any) as any).delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Oferta excluída");
     load();
@@ -119,8 +119,8 @@ function OfferModal({ initial, onClose, onSaved }: { initial: Partial<Offer>; on
     setSaving(true);
     const payload = { ...f, description: f.description || null, badge_text: f.badge_text || null };
     const { error } = initial.id
-      ? await supabase.from("offers").update(payload).eq("id", initial.id)
-      : await supabase.from("offers").insert(payload);
+      ? await (supabase.from("offers" as any) as any).update(payload).eq("id", initial.id)
+      : await (supabase.from("offers" as any) as any).insert(payload);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Oferta salva");

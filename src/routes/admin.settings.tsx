@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Settings as SettingsIcon, CreditCard, Mail, Plug, ShieldCheck, Save, Type, Palette, Link as LinkIcon, Key, Hash } from "lucide-react";
+import { Settings as SettingsIcon, CreditCard, Mail, Plug, ShieldCheck, Save, Type, Palette, Link as LinkIcon, Key, Hash, CloudLightning, Play, AlertCircle } from "lucide-react";
 import { Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
 
 export const Route = createFileRoute("/admin/settings")({ component: Page });
@@ -14,6 +14,7 @@ type SettingsShape = {
   email: { smtpHost: string; sender: string };
   integrations: { apiKey: string; webhookUrl: string };
   security: { minPasswordLen: number; require2faAdmins: boolean };
+  vercel: { deployHookUrl: string };
 };
 
 const DEFAULTS: SettingsShape = {
@@ -22,6 +23,7 @@ const DEFAULTS: SettingsShape = {
   email: { smtpHost: "", sender: "" },
   integrations: { apiKey: "", webhookUrl: "" },
   security: { minPasswordLen: 8, require2faAdmins: false },
+  vercel: { deployHookUrl: "" },
 };
 
 const TABS = [
@@ -30,6 +32,7 @@ const TABS = [
   { id: "email", label: "Email", icon: Mail },
   { id: "integrations", label: "Integrações", icon: Plug },
   { id: "security", label: "Segurança", icon: ShieldCheck },
+  { id: "vercel", label: "Vercel Deploy", icon: CloudLightning },
 ] as const;
 
 function loadSettings(): SettingsShape {
@@ -37,7 +40,11 @@ function loadSettings(): SettingsShape {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw);
-    return { ...DEFAULTS, ...parsed };
+    return {
+      ...DEFAULTS,
+      ...parsed,
+      vercel: parsed.vercel || DEFAULTS.vercel,
+    };
   } catch {
     return DEFAULTS;
   }
@@ -47,6 +54,7 @@ function Page() {
   const [tab, setTab] = useState<typeof TABS[number]["id"]>("general");
   const [s, setS] = useState<SettingsShape>(DEFAULTS);
   const [dirty, setDirty] = useState(false);
+  const [deploying, setDeploying] = useState(false);
 
   useEffect(() => { setS(loadSettings()); }, []);
 
@@ -59,6 +67,28 @@ function Page() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     setDirty(false);
     toast.success("Configurações salvas");
+  };
+
+  const triggerDeploy = async () => {
+    const url = s.vercel?.deployHookUrl;
+    if (!url) {
+      toast.error("Configure a URL do Deploy Hook primeiro!");
+      return;
+    }
+    setDeploying(true);
+    try {
+      const res = await fetch(url, { method: "POST" });
+      if (res.ok) {
+        toast.success("Deploy disparado com sucesso na Vercel!");
+      } else {
+        toast.error(`Falha ao disparar deploy: status ${res.status}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao conectar com a Vercel.");
+    } finally {
+      setDeploying(false);
+    }
   };
 
   return (
@@ -231,6 +261,83 @@ function Page() {
                   </label>
                 </Field>
               </>
+            )}
+
+            {tab === "vercel" && (
+              <div className="space-y-6">
+                <div className="border border-white/5 bg-white/[0.01] rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary">
+                      <CloudLightning className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-medium">Deploy Manual (Vercel)</h3>
+                      <p className="text-xs text-muted-foreground">Dispare deploys de produção diretamente do seu painel administrativo.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-2">
+                    <Field label="URL do Deploy Hook da Vercel" icon={LinkIcon} hint="Crie em Configurações do Projeto Vercel > Git > Deploy Hooks">
+                      <input
+                        value={s.vercel?.deployHookUrl || ""}
+                        onChange={(e) => update("vercel", { deployHookUrl: e.target.value })}
+                        placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                        className={`${inputClass} font-mono`}
+                      />
+                    </Field>
+
+                    <div className="flex justify-start">
+                      <button
+                        onClick={triggerDeploy}
+                        disabled={deploying || !s.vercel?.deployHookUrl}
+                        className="gradient-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition hover:opacity-90 active:scale-95 shadow-[0_8px_24px_-8px_oklch(0.65_0.22_290/0.6)]"
+                      >
+                        {deploying ? (
+                          <>
+                            <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                            Disparando Deploy...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 fill-current" />
+                            Disparar Deploy de Produção
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border border-amber-500/10 bg-amber-500/[0.02] rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center gap-2.5 text-amber-500">
+                    <AlertCircle className="h-4 w-4" />
+                    <h4 className="text-sm font-medium">Como desativar o deploy automático da Vercel?</h4>
+                  </div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Por padrão, a Vercel realiza um novo deploy para cada commit enviado ao GitHub. Para fazer com que o deploy aconteça <strong>apenas</strong> quando você clicar no botão acima:
+                  </p>
+                  <ol className="text-xs space-y-2 text-muted-foreground list-decimal pl-4">
+                    <li>
+                      Acesse o painel da <strong>Vercel</strong> e selecione o seu projeto.
+                    </li>
+                    <li>
+                      Vá em <strong>Settings (Configurações)</strong> &gt; <strong>Git</strong>.
+                    </li>
+                    <li>
+                      Role até a seção <strong>Ignored Build Step</strong> (Etapa de compilação ignorada).
+                    </li>
+                    <li>
+                      Selecione a opção <strong>Custom</strong> no dropdown e insira o seguinte comando no campo de texto:
+                      <div className="mt-1.5 flex items-center justify-between gap-2 p-2.5 rounded-lg bg-black/40 border border-white/5 font-mono text-[11px] text-amber-400/90 select-all">
+                        <code>echo "Skipping push build" && exit 0</code>
+                      </div>
+                    </li>
+                    <li>
+                      Clique em <strong>Save</strong> para salvar as alterações. Pronto! Agora a Vercel só criará deploys através do botão neste painel.
+                    </li>
+                  </ol>
+                </div>
+              </div>
             )}
           </div>
         </div>

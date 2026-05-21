@@ -152,8 +152,8 @@ const DEFAULT_PLANS: Plan[] = [
 const PLANS_KEY = "plans_config";
 
 async function loadPlans(): Promise<Plan[]> {
-  const { data, error } = await supabase
-    .from("app_settings" as any)
+  const { data, error } = await (supabase
+    .from("app_settings" as any) as any)
     .select("value")
     .eq("key", PLANS_KEY)
     .maybeSingle();
@@ -168,8 +168,8 @@ async function loadPlans(): Promise<Plan[]> {
 
 async function savePlans(plans: Plan[]) {
   // Try saving to app_settings
-  const { error } = await supabase
-    .from("app_settings" as any)
+  const { error } = await (supabase
+    .from("app_settings" as any) as any)
     .upsert({ key: PLANS_KEY, value: plans, updated_at: new Date().toISOString() }, { onConflict: "key" });
   if (error) {
     // Fallback to localStorage
