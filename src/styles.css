@@ -61,8 +61,35 @@
   --shadow-glow: 0 0 40px oklch(0.65 0.22 290 / 0.25);
 }
 
+.light {
+  --background: oklch(0.98 0.005 270);
+  --foreground: oklch(0.15 0.01 270);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.01 270);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.01 270);
+  --primary: oklch(0.55 0.22 290);
+  --primary-foreground: oklch(0.99 0.005 270);
+  --secondary: oklch(0.94 0.01 270);
+  --secondary-foreground: oklch(0.2 0.02 270);
+  --muted: oklch(0.94 0.01 270);
+  --muted-foreground: oklch(0.45 0.02 270);
+  --accent: oklch(0.55 0.22 290);
+  --accent-foreground: oklch(0.99 0.005 270);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.98 0.005 270);
+  --border: oklch(0 0 0 / 10%);
+  --input: oklch(0 0 0 / 5%);
+  --ring: oklch(0.55 0.22 290);
+  --glass: oklch(1 0 0 / 0.85);
+  --glass-border: oklch(0 0 0 / 0.08);
+  --gradient-primary: linear-gradient(135deg, oklch(0.55 0.22 290), oklch(0.5 0.22 250));
+  --shadow-glass: 0 8px 32px 0 oklch(0 0 0 / 0.08);
+  --shadow-glow: 0 0 40px oklch(0.55 0.22 290 / 0.15);
+}
+
 @layer base {
-  * { border-color: var(--color-border); }
+  *:where(:not(.react-flow *)) { border-color: var(--color-border); }
   html, body { background-color: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); }
   body {
     background-image:
@@ -71,6 +98,156 @@
     background-repeat: no-repeat;
     min-height: 100vh;
   }
+  .light body, .light {
+    background-image:
+      radial-gradient(ellipse 50% 40% at 0% 0%, oklch(0.7 0.12 290 / 0.06), transparent 70%),
+      radial-gradient(ellipse 45% 35% at 100% 100%, oklch(0.7 0.12 250 / 0.04), transparent 70%);
+  }
+
+  /* Custom scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.4 0.02 270 / 0.5) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: oklch(0.4 0.02 270 / 0.5);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0.02 270 / 0.7);
+  }
+  .light *::-webkit-scrollbar-thumb {
+    background: oklch(0.6 0.02 270 / 0.3);
+  }
+  .light *::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0.02 270 / 0.5);
+  }
+}
+
+/* Tiptap editor styles */
+.tiptap {
+  outline: none;
+}
+.tiptap p { margin: 0.25em 0; }
+.tiptap h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0 0.25em; }
+.tiptap h2 { font-size: 1.25em; font-weight: 600; margin: 0.5em 0 0.25em; }
+.tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0 0.2em; }
+.tiptap ul { list-style: disc; padding-left: 1.5em; margin: 0.25em 0; }
+.tiptap ol { list-style: decimal; padding-left: 1.5em; margin: 0.25em 0; }
+.tiptap li { margin: 0.1em 0; }
+.tiptap mark { border-radius: 2px; padding: 0 2px; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: oklch(0.5 0.02 270 / 0.5);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Prose styles for rendered rich content */
+.prose-invert h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0 0.25em; }
+.prose-invert h2 { font-size: 1.25em; font-weight: 600; margin: 0.5em 0 0.25em; }
+.prose-invert h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0 0.2em; }
+.prose-invert ul { list-style: disc; padding-left: 1.5em; margin: 0.25em 0; }
+.prose-invert ol { list-style: decimal; padding-left: 1.5em; margin: 0.25em 0; }
+.prose-invert li { margin: 0.1em 0; }
+.prose-invert p { margin: 0.25em 0; }
+.prose-invert mark { border-radius: 2px; padding: 0 2px; }
+
+/* React Flow overrides */
+/*
+ * Tailwind v4 preflight applies `*, ::before, ::after { border: 0 solid }` to all elements.
+ * Fluxcore uses Tailwind v3 which doesn't have this issue.
+ * This causes React Flow to miscalculate handle positions because the computed
+ * border-style changes when nodes are measured.
+ * Fix: Reset border to initial (none) for all React Flow internals,
+ * then re-enable border-style only on handles that need it.
+ */
+.react-flow *,
+.react-flow *::before,
+.react-flow *::after {
+  border-style: none;
+  border-width: 0;
+  border-color: transparent;
+}
+/* Re-enable borders on handles (they use !border-2 class) */
+.react-flow .react-flow__handle {
+  border-style: solid !important;
+}
+/* Re-enable borders on internal node elements that need them */
+.react-flow__node .border,
+.react-flow__node [class*="border-"] {
+  border-style: solid;
+}
+.react-flow__node {
+  border: none !important;
+  outline: none !important;
+}
+.react-flow__node.selected {
+  border: none !important;
+  outline: none !important;
+}
+/* Selection visual via CSS */
+.react-flow__node .funnel-node-delete {
+  visibility: hidden;
+  pointer-events: none;
+}
+.react-flow__node.selected .funnel-node-delete {
+  visibility: visible;
+  pointer-events: auto;
+}
+.react-flow__node.selected .funnel-node-wrapper {
+  outline: 2px solid oklch(0.65 0.22 290 / 0.6);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+.react-flow__nodesselection-rect {
+  background: transparent !important;
+  border: 1px solid oklch(0.65 0.22 290 / 0.4) !important;
+}
+.react-flow__selection {
+  background: oklch(0.65 0.22 290 / 0.06) !important;
+  border: 1px solid oklch(0.65 0.22 290 / 0.4) !important;
+}
+.react-flow__edge-interaction {
+  stroke: transparent;
+  stroke-width: 20;
+}
+/* Multi-connect source highlight */
+.react-flow__node.multi-connect-source {
+  outline: 2px solid oklch(0.65 0.22 290) !important;
+  outline-offset: 6px;
+  border-radius: 12px;
+  animation: multi-connect-pulse 1.5s ease-in-out infinite;
+}
+@keyframes multi-connect-pulse {
+  0%, 100% { outline-color: oklch(0.65 0.22 290 / 0.8); }
+  50% { outline-color: oklch(0.65 0.22 290 / 0.4); }
+}
+
+/* MiniMap styling */
+.react-flow__minimap {
+  background-color: #111115 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
+  overflow: hidden !important;
+}
+.react-flow__minimap svg {
+  background: transparent !important;
+}
+.react-flow__minimap-mask {
+  fill: rgba(10, 10, 14, 0.7) !important;
+}
+.react-flow__minimap-node {
+  stroke: none !important;
 }
 
 @layer utilities {
@@ -121,12 +298,37 @@
   .stagger-enter > *:nth-child(5) { animation-delay: 120ms; }
   .stagger-enter > *:nth-child(n+6) { animation-delay: 150ms; }
 
+  /* Dashboard ambient animations */
+  @keyframes ambient-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.05); }
+  }
+  @keyframes ambient-float {
+    0%, 100% { transform: translate(0, 0); }
+    33% { transform: translate(10px, -15px); }
+    66% { transform: translate(-8px, 8px); }
+  }
+  @keyframes wizard-slide-in {
+    from { opacity: 0; transform: translateY(16px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes wizard-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-wizard-in { animation: wizard-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .animate-wizard-fade { animation: wizard-fade 0.25s ease-out both; }
+  .animate-ambient-pulse { animation: ambient-pulse 12s ease-in-out infinite; }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-up,
     .admin-route-slot,
     .admin-route-slot > *,
     .admin-route-slot > *:not(.fixed),
-    .stagger-enter > * {
+    .stagger-enter > *,
+    .animate-wizard-in,
+    .animate-wizard-fade,
+    .animate-ambient-pulse {
       animation: none;
     }
   }

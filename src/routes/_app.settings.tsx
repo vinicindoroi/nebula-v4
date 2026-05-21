@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { Field, inputClass } from "@/components/admin/Modal";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
@@ -45,6 +46,7 @@ function SettingsPage() {
   const [newPass, setNewPass] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     try {
@@ -136,8 +138,18 @@ function SettingsPage() {
               </Section>
 
               <Section title="Aparência" description="Personalize a interface.">
-                <SettingRow icon={Palette} title="Tema" desc="Escuro (padrão)">
-                  <span className="text-xs px-2 py-1 rounded-lg bg-white/5 text-muted-foreground">Em breve</span>
+                <SettingRow icon={Palette} title="Tema" desc="Escolha entre escuro, claro ou automático.">
+                  <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/10">
+                    {([["dark", "Escuro"], ["light", "Claro"], ["system", "Sistema"]] as const).map(([id, label]) => (
+                      <button
+                        key={id}
+                        onClick={() => setTheme(id)}
+                        className={`text-xs px-3 py-1.5 rounded-lg transition ${theme === id ? "bg-primary/15 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </SettingRow>
                 <SettingRow icon={Globe} title="Idioma" desc="Português · Brasil">
                   <span className="text-xs px-2 py-1 rounded-lg bg-white/5 text-muted-foreground">PT-BR</span>

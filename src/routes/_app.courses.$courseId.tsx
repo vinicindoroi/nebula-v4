@@ -5,6 +5,7 @@ import { Check, Play, ArrowLeft, Lock, Download, Paperclip } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { useAddXp } from "@/hooks/use-xp";
 import { NebulaPlayer, type Chapter } from "@/components/player/NebulaPlayer";
 import { LessonComments } from "@/components/lessons/LessonComments";
 import { getSignedVideoUrl, isStoragePath, getAttachmentDownloadUrl } from "@/lib/storage";
@@ -87,6 +88,8 @@ function CourseDetail() {
     }
   }, [data, activeLessonId]);
 
+  const addXp = useAddXp();
+
   const toggle = useMutation({
     mutationFn: async ({ lessonId, completed }: { lessonId: string; completed: boolean }) => {
       if (completed) {
@@ -101,6 +104,7 @@ function CourseDetail() {
           .from("lesson_progress")
           .insert({ user_id: user!.id, lesson_id: lessonId });
         if (error) throw error;
+        addXp.mutate("complete_lesson");
       }
     },
     onSuccess: () => {

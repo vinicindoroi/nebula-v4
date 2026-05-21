@@ -9,8 +9,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { MembersSidebar } from "@/components/members/MembersSidebar";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { notifyUser } from "@/lib/notify";
 import { useSavedPosts, useToggleSave } from "@/hooks/use-saved-posts";
+import { useAddXp } from "@/hooks/use-xp";
 
 export const Route = createFileRoute("/_app/community")({
   component: CommunityPage,
@@ -52,6 +54,7 @@ function CommunityPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const { data: savedPosts = [] } = useSavedPosts();
   const toggleSave = useToggleSave();
+  const addXp = useAddXp();
 
   // Realtime
   useEffect(() => {
@@ -152,6 +155,7 @@ function CommunityPage() {
           const actorName = (user?.user_metadata as any)?.full_name || user?.email?.split("@")[0] || "Alguém";
           notifyUser({ recipientId: post.user_id, actorId: user!.id, title: "Nova curtida no seu post", content: `${actorName} curtiu seu post na comunidade` });
         }
+        addXp.mutate("like");
       }
     },
     onMutate: async ({ postId, liked }) => {
@@ -189,32 +193,30 @@ function CommunityPage() {
 
         {/* Composer */}
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-sm overflow-hidden">
-          <div className="p-5">
-            <div className="flex gap-3">
+          <div className="px-5 pt-4 pb-3">
+            <div className="flex items-center gap-3 mb-3">
               <Avatar initials={initials} />
-              <div className="flex-1 min-w-0">
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value.slice(0, MAX))}
-                  placeholder="O que está pensando?"
-                  rows={2}
-                  className="w-full bg-transparent text-sm outline-none resize-none placeholder:text-muted-foreground/50 leading-relaxed"
-                />
-              </div>
+              <span className="text-sm font-medium text-foreground/80">Nova publicação</span>
             </div>
-
-            {imagePreview && (
-              <div className="relative mt-3 ml-[52px] rounded-xl overflow-hidden border border-white/10 max-h-56">
-                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover max-h-56" />
-                <button
-                  onClick={removeImage}
-                  className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/70 backdrop-blur-sm flex items-center justify-center hover:bg-black/90 transition"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
+            <RichTextEditor
+              content={text}
+              onChange={(html) => setText(html.slice(0, MAX))}
+              placeholder="O que está pensando?"
+              minHeight="80px"
+            />
           </div>
+
+          {imagePreview && (
+            <div className="relative mx-5 mb-3 rounded-xl overflow-hidden border border-white/10 max-h-56">
+              <img src={imagePreview} alt="Preview" className="w-full h-full object-cover max-h-56" />
+              <button
+                onClick={removeImage}
+                className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/70 backdrop-blur-sm flex items-center justify-center hover:bg-black/90 transition"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           <div className="px-5 py-3 border-t border-white/[0.06] bg-white/[0.01] flex items-center justify-between">
             <div className="flex gap-1 text-muted-foreground">
@@ -320,7 +322,7 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
       {/* Content */}
       {post.content && (
         <div className="px-5 pt-3 pb-1">
-          <p className="text-[14px] leading-[1.7] whitespace-pre-wrap break-words">{post.content}</p>
+          <div className="text-[14px] leading-[1.7] break-words prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
         </div>
       )}
 
@@ -389,6 +391,7 @@ function CommentSection({ postId, postOwnerId, comments, userId }: { postId: str
   const [imgPreview, setImgPreview] = useState<string | null>(null);
   const imgRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+  const addXp = useAddXp();
 
   const handleImg = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -433,7 +436,7 @@ function CommentSection({ postId, postOwnerId, comments, userId }: { postId: str
       const actorName = profile?.full_name || "Alguém";
       notifyUser({ recipientId: postOwnerId, actorId: userId, title: "Novo comentário no seu post", content: `${actorName} comentou no seu post` });
     },
-    onSuccess: () => { setText(""); clearImg(); qc.invalidateQueries({ queryKey: ["posts"] }); },
+    onSuccess: () => { setText(""); clearImg(); qc.invalidateQueries({ queryKey: ["posts"] }); addXp.mutate("comment"); },
     onError: (e: any) => toast.error(e.message),
   });
 

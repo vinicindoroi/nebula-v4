@@ -17,11 +17,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSalesRouteImport } from './routes/admin.sales'
 import { Route as AdminPlayerRouteImport } from './routes/admin.player'
+import { Route as AdminPlansRouteImport } from './routes/admin.plans'
 import { Route as AdminOffersRouteImport } from './routes/admin.offers'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminModulesRouteImport } from './routes/admin.modules'
 import { Route as AdminMembersRouteImport } from './routes/admin.members'
 import { Route as AdminLogsRouteImport } from './routes/admin.logs'
+import { Route as AdminFunnelsRouteImport } from './routes/admin.funnels'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCoursesRouteImport } from './routes/admin.courses'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
@@ -31,6 +33,8 @@ import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSavedRouteImport } from './routes/_app.saved'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
+import { Route as AppNotesRouteImport } from './routes/_app.notes'
+import { Route as AppFunnelsRouteImport } from './routes/_app.funnels'
 import { Route as AppForumRouteImport } from './routes/_app.forum'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCoursesRouteImport } from './routes/_app.courses'
@@ -76,6 +80,11 @@ const AdminPlayerRoute = AdminPlayerRouteImport.update({
   path: '/player',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPlansRoute = AdminPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminOffersRoute = AdminOffersRouteImport.update({
   id: '/offers',
   path: '/offers',
@@ -99,6 +108,11 @@ const AdminMembersRoute = AdminMembersRouteImport.update({
 const AdminLogsRoute = AdminLogsRouteImport.update({
   id: '/logs',
   path: '/logs',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFunnelsRoute = AdminFunnelsRouteImport.update({
+  id: '/funnels',
+  path: '/funnels',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
@@ -146,6 +160,16 @@ const AppProfileRoute = AppProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
+const AppNotesRoute = AppNotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFunnelsRoute = AppFunnelsRouteImport.update({
+  id: '/funnels',
+  path: '/funnels',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppForumRoute = AppForumRouteImport.update({
   id: '/forum',
   path: '/forum',
@@ -181,6 +205,8 @@ export interface FileRoutesByFullPath {
   '/courses': typeof AppCoursesRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/forum': typeof AppForumRoute
+  '/funnels': typeof AppFunnelsRoute
+  '/notes': typeof AppNotesRoute
   '/profile': typeof AppProfileRoute
   '/saved': typeof AppSavedRoute
   '/settings': typeof AppSettingsRoute
@@ -190,11 +216,13 @@ export interface FileRoutesByFullPath {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/funnels': typeof AdminFunnelsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/members': typeof AdminMembersRoute
   '/admin/modules': typeof AdminModulesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/offers': typeof AdminOffersRoute
+  '/admin/plans': typeof AdminPlansRoute
   '/admin/player': typeof AdminPlayerRoute
   '/admin/sales': typeof AdminSalesRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -209,6 +237,8 @@ export interface FileRoutesByTo {
   '/courses': typeof AppCoursesRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/forum': typeof AppForumRoute
+  '/funnels': typeof AppFunnelsRoute
+  '/notes': typeof AppNotesRoute
   '/profile': typeof AppProfileRoute
   '/saved': typeof AppSavedRoute
   '/settings': typeof AppSettingsRoute
@@ -218,11 +248,13 @@ export interface FileRoutesByTo {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/funnels': typeof AdminFunnelsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/members': typeof AdminMembersRoute
   '/admin/modules': typeof AdminModulesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/offers': typeof AdminOffersRoute
+  '/admin/plans': typeof AdminPlansRoute
   '/admin/player': typeof AdminPlayerRoute
   '/admin/sales': typeof AdminSalesRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -239,6 +271,8 @@ export interface FileRoutesById {
   '/_app/courses': typeof AppCoursesRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/forum': typeof AppForumRoute
+  '/_app/funnels': typeof AppFunnelsRoute
+  '/_app/notes': typeof AppNotesRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/saved': typeof AppSavedRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -248,11 +282,13 @@ export interface FileRoutesById {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/funnels': typeof AdminFunnelsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/members': typeof AdminMembersRoute
   '/admin/modules': typeof AdminModulesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/offers': typeof AdminOffersRoute
+  '/admin/plans': typeof AdminPlansRoute
   '/admin/player': typeof AdminPlayerRoute
   '/admin/sales': typeof AdminSalesRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -269,6 +305,8 @@ export interface FileRouteTypes {
     | '/courses'
     | '/dashboard'
     | '/forum'
+    | '/funnels'
+    | '/notes'
     | '/profile'
     | '/saved'
     | '/settings'
@@ -278,11 +316,13 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
+    | '/admin/funnels'
     | '/admin/logs'
     | '/admin/members'
     | '/admin/modules'
     | '/admin/notifications'
     | '/admin/offers'
+    | '/admin/plans'
     | '/admin/player'
     | '/admin/sales'
     | '/admin/settings'
@@ -297,6 +337,8 @@ export interface FileRouteTypes {
     | '/courses'
     | '/dashboard'
     | '/forum'
+    | '/funnels'
+    | '/notes'
     | '/profile'
     | '/saved'
     | '/settings'
@@ -306,11 +348,13 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
+    | '/admin/funnels'
     | '/admin/logs'
     | '/admin/members'
     | '/admin/modules'
     | '/admin/notifications'
     | '/admin/offers'
+    | '/admin/plans'
     | '/admin/player'
     | '/admin/sales'
     | '/admin/settings'
@@ -326,6 +370,8 @@ export interface FileRouteTypes {
     | '/_app/courses'
     | '/_app/dashboard'
     | '/_app/forum'
+    | '/_app/funnels'
+    | '/_app/notes'
     | '/_app/profile'
     | '/_app/saved'
     | '/_app/settings'
@@ -335,11 +381,13 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
+    | '/admin/funnels'
     | '/admin/logs'
     | '/admin/members'
     | '/admin/modules'
     | '/admin/notifications'
     | '/admin/offers'
+    | '/admin/plans'
     | '/admin/player'
     | '/admin/sales'
     | '/admin/settings'
@@ -412,6 +460,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPlayerRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/plans': {
+      id: '/admin/plans'
+      path: '/plans'
+      fullPath: '/admin/plans'
+      preLoaderRoute: typeof AdminPlansRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/offers': {
       id: '/admin/offers'
       path: '/offers'
@@ -445,6 +500,13 @@ declare module '@tanstack/react-router' {
       path: '/logs'
       fullPath: '/admin/logs'
       preLoaderRoute: typeof AdminLogsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/funnels': {
+      id: '/admin/funnels'
+      path: '/funnels'
+      fullPath: '/admin/funnels'
+      preLoaderRoute: typeof AdminFunnelsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/dashboard': {
@@ -510,6 +572,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/notes': {
+      id: '/_app/notes'
+      path: '/notes'
+      fullPath: '/notes'
+      preLoaderRoute: typeof AppNotesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/funnels': {
+      id: '/_app/funnels'
+      path: '/funnels'
+      fullPath: '/funnels'
+      preLoaderRoute: typeof AppFunnelsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/forum': {
       id: '/_app/forum'
       path: '/forum'
@@ -565,6 +641,8 @@ interface AppRouteChildren {
   AppCoursesRoute: typeof AppCoursesRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
   AppForumRoute: typeof AppForumRoute
+  AppFunnelsRoute: typeof AppFunnelsRoute
+  AppNotesRoute: typeof AppNotesRoute
   AppProfileRoute: typeof AppProfileRoute
   AppSavedRoute: typeof AppSavedRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -575,6 +653,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppCoursesRoute: AppCoursesRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
   AppForumRoute: AppForumRoute,
+  AppFunnelsRoute: AppFunnelsRoute,
+  AppNotesRoute: AppNotesRoute,
   AppProfileRoute: AppProfileRoute,
   AppSavedRoute: AppSavedRoute,
   AppSettingsRoute: AppSettingsRoute,
@@ -589,11 +669,13 @@ interface AdminRouteChildren {
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminCoursesRoute: typeof AdminCoursesRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminFunnelsRoute: typeof AdminFunnelsRoute
   AdminLogsRoute: typeof AdminLogsRoute
   AdminMembersRoute: typeof AdminMembersRoute
   AdminModulesRoute: typeof AdminModulesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminOffersRoute: typeof AdminOffersRoute
+  AdminPlansRoute: typeof AdminPlansRoute
   AdminPlayerRoute: typeof AdminPlayerRoute
   AdminSalesRoute: typeof AdminSalesRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -606,11 +688,13 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCouponsRoute: AdminCouponsRoute,
   AdminCoursesRoute: AdminCoursesRoute,
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminFunnelsRoute: AdminFunnelsRoute,
   AdminLogsRoute: AdminLogsRoute,
   AdminMembersRoute: AdminMembersRoute,
   AdminModulesRoute: AdminModulesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminOffersRoute: AdminOffersRoute,
+  AdminPlansRoute: AdminPlansRoute,
   AdminPlayerRoute: AdminPlayerRoute,
   AdminSalesRoute: AdminSalesRoute,
   AdminSettingsRoute: AdminSettingsRoute,

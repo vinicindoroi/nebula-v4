@@ -25,12 +25,8 @@ create policy "Authenticated users can read attachments"
 create policy "Admins can manage attachments"
   on public.lesson_attachments for all
   to authenticated
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-  )
-  with check (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-  );
+  using (public.has_role(auth.uid(), 'admin'))
+  with check (public.has_role(auth.uid(), 'admin'));
 
 -- Bucket separado para attachments
 insert into storage.buckets (id, name, public, file_size_limit)
@@ -48,7 +44,7 @@ create policy "Admins can upload attachments"
   to authenticated
   with check (
     bucket_id = 'lesson-attachments'
-    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    and public.has_role(auth.uid(), 'admin')
   );
 
 create policy "Admins can delete attachments"
@@ -56,5 +52,5 @@ create policy "Admins can delete attachments"
   to authenticated
   using (
     bucket_id = 'lesson-attachments'
-    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    and public.has_role(auth.uid(), 'admin')
   );

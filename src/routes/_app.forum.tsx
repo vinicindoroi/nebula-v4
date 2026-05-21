@@ -1,14 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Search, Plus, Heart, MessageCircle, Eye, Hash, Briefcase,
-  X, Send, Image as ImageIcon, Pin, Trash2,
+  X, Send, Image as ImageIcon, Pin, Trash2, Edit3, Bookmark,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { Modal, Field, inputClass } from "@/components/admin/Modal";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { notifyUser } from "@/lib/notify";
+import { useSavedPosts, useToggleSave } from "@/hooks/use-saved-posts";
+import { useAddXp } from "@/hooks/use-xp";
 
 export const Route = createFileRoute("/_app/forum")({
   component: ForumPage,
@@ -39,6 +44,10 @@ function ForumPage() {
   const [showServices, setShowServices] = useState(false);
   const [creating, setCreating] = useState(false);
   const [viewingPost, setViewingPost] = useState<ForumPost | null>(null);
+  const [editingPost, setEditingPost] = useState<ForumPost | null>(null);
+  const { data: savedPosts = [] } = useSavedPosts();
+  const toggleSave = useToggleSave();
+  const addXp = useAddXp();
 
   useEffect(() => {
     if (!user) return;
@@ -97,7 +106,15 @@ function ForumPage() {
   const toggleLike = useMutation({
     mutationFn: async ({ postId, liked }: { postId: string; liked: boolean }) => {
       if (liked) await db.from("forum_likes").delete().eq("post_id", postId).eq("user_id", user!.id);
-      else await db.from("forum_likes").insert({ post_id: postId, user_id: user!.id });
+      else {
+        await db.from("forum_likes").insert({ post_id: postId, user_id: user!.id });
+        const post = posts.find((p) => p.id === postId);
+        if (post) {
+          const actorName = (user?.user_metadata as any)?.full_name || user?.email?.split("@")[0] || "Alguém";
+          notifyUser({ recipientId: post.user_id, actorId: user!.id, title: "Nova curtida no seu post", content: `${actorName} curtiu "${post.title}"` });
+        }
+        addXp.mutate("like");
+      }
     },
     onMutate: async ({ postId, liked }) => {
       await qc.cancelQueries({ queryKey: ["forum"] });
@@ -214,9 +231,7 @@ function ForumPostCard({ post, userId, onLike, onDelete, onClick }: { post: Foru
           )}
         </div>
         <h3 className="text-base font-semibold leading-tight mb-2">{post.title}</h3>
-        <div className={`text-sm text-muted-foreground/90 leading-relaxed whitespace-pre-wrap break-words ${!expanded && isLong ? "line-clamp-4" : ""}`}>
-          {renderHashtags(post.content)}
-        </div>
+        <div className={`text-sm text-muted-foreground/90 leading-relaxed break-words prose prose-invert prose-sm max-w-none ${!expanded && isLong ? "line-clamp-4" : ""}`} dangerouslySetInnerHTML={{ __html: post.content }} />
         {isLong && <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} className="text-xs text-primary mt-1 hover:underline">{expanded ? "Ver menos" : "Ver mais"}</button>}
         {post.is_service && post.service_price && (
           <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-medium">
@@ -250,6 +265,7 @@ function ForumPostCard({ post, userId, onLike, onDelete, onClick }: { post: Foru
 /* ─── Post Detail Modal ─── */
 function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; userId: string; onClose: () => void; onLike: () => void }) {
   const qc = useQueryClient();
+  const addXp = useAddXp();
   const [replyText, setReplyText] = useState("");
   const [replyImg, setReplyImg] = useState<File | null>(null);
   const [replyPreview, setReplyPreview] = useState<string | null>(null);
@@ -287,7 +303,7 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
       const { error } = await db.from("forum_replies").insert({ post_id: post.id, user_id: userId, content: content || "", image_url });
       if (error) throw error;
     },
-    onSuccess: () => { setReplyText(""); clearReplyImg(); qc.invalidateQueries({ queryKey: ["forum-replies", post.id] }); qc.invalidateQueries({ queryKey: ["forum"] }); },
+    onSuccess: () => { setReplyText(""); clearReplyImg(); qc.invalidateQueries({ queryKey: ["forum-replies", post.id] }); qc.invalidateQueries({ queryKey: ["forum"] }); addXp.mutate("forum_reply"); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -313,9 +329,9 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
   const authorName = post.author?.full_name || "Membro";
   const authorInitials = authorName.slice(0, 2).toUpperCase();
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto py-8 px-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/80" />
       <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-2xl rounded-3xl overflow-hidden animate-fade-up" style={{ background: "oklch(0.13 0.012 270)", border: "1px solid oklch(1 0 0 / 0.08)", boxShadow: "0 40px 100px -20px rgba(0,0,0,0.8)" }}>
         <button onClick={onClose} className="absolute top-4 right-4 z-10 h-8 w-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-black/60 transition"><X className="h-4 w-4" /></button>
 
@@ -339,7 +355,7 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
           {editing ? (
             <div className="space-y-3">
               <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-base font-semibold outline-none focus:ring-2 focus:ring-primary/20" maxLength={200} />
-              <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={6} className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 resize-none leading-relaxed" maxLength={10000} />
+              <RichTextEditor content={editContent} onChange={(html) => setEditContent(html)} placeholder="Edite o conteúdo..." />
               <div className="flex gap-2">
                 <button onClick={() => saveEdit.mutate()} disabled={saveEdit.isPending} className="gradient-primary text-primary-foreground px-4 py-2 rounded-xl text-xs font-medium disabled:opacity-50">{saveEdit.isPending ? "Salvando..." : "Salvar"}</button>
                 <button onClick={() => { setEditing(false); setEditTitle(post.title); setEditContent(post.content); }} className="px-4 py-2 rounded-xl text-xs text-muted-foreground hover:bg-white/5 transition">Cancelar</button>
@@ -348,7 +364,7 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
           ) : (
             <>
               <h2 className="text-xl font-bold leading-tight">{post.title}</h2>
-              <p className="text-sm text-foreground/80 leading-[1.8] whitespace-pre-wrap break-words">{renderHashtags(post.content)}</p>
+              <div className="text-sm text-foreground/80 leading-[1.8] break-words prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
             </>
           )}
 
@@ -397,7 +413,8 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -438,7 +455,7 @@ function CreatePostModal({ tags, onClose, onCreated }: { tags: ForumTag[]; onClo
     <Modal open onClose={onClose} title="Novo post" kicker="Fórum" description="Compartilhe conhecimento, tire dúvidas ou ofereça serviços." size="lg" footer={<><button onClick={onClose} className="px-3.5 py-2 rounded-xl text-sm hover:bg-white/5">Cancelar</button><button onClick={save} disabled={saving} className="gradient-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50">{saving ? "Publicando..." : "Publicar"}</button></>}>
       <div className="space-y-4">
         <Field label="Título" required><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex: Como configurar webhooks no Supabase" className={inputClass} maxLength={200} /></Field>
-        <Field label="Conteúdo" required hint="Suporta #hashtags no texto."><textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={6} placeholder="Descreva em detalhes..." className={`${inputClass} resize-none`} maxLength={10000} /></Field>
+        <Field label="Conteúdo" required hint="Use a toolbar para formatar o texto."><RichTextEditor content={form.content} onChange={(html) => setForm({ ...form, content: html })} placeholder="Descreva em detalhes..." /></Field>
         <div><label className="text-xs font-medium text-muted-foreground mb-2 block">Tags</label><div className="flex gap-1.5 flex-wrap">{tags.map((t) => <button key={t.id} type="button" onClick={() => toggleTag(t.id)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${selectedTags.includes(t.id) ? "border-white/20 bg-white/10 text-foreground" : "border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5"}`}><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: t.color }} />{t.name}</button>)}</div></div>
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
           <Briefcase className="h-4 w-4 text-pink-400" />

@@ -10,6 +10,8 @@ import {
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
+import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -104,6 +106,13 @@ function RootShell({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            var t = localStorage.getItem('app_theme') || 'dark';
+            var resolved = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+            document.documentElement.classList.add(resolved);
+          })();
+        `}} />
       </head>
       <body>
         {children}
@@ -119,8 +128,12 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
-        <Toaster />
+        <OrganizationProvider>
+          <TooltipProvider>
+            <Outlet />
+            <Toaster />
+          </TooltipProvider>
+        </OrganizationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

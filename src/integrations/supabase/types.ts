@@ -39,6 +39,134 @@ export type Database = {
   }
   public: {
     Tables: {
+      funnels: {
+        Row: {
+          id: string
+          user_id: string
+          organization_id: string | null
+          name: string
+          description: string | null
+          funnel_type: string
+          nodes: Json
+          edges: Json
+          viewport: Json
+          tracking_token: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          organization_id?: string | null
+          name: string
+          description?: string | null
+          funnel_type?: string
+          nodes?: Json
+          edges?: Json
+          viewport?: Json
+          tracking_token?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          organization_id?: string | null
+          name?: string
+          description?: string | null
+          funnel_type?: string
+          nodes?: Json
+          edges?: Json
+          viewport?: Json
+          tracking_token?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      funnel_events: {
+        Row: {
+          id: string
+          funnel_id: string | null
+          node_id: string
+          event_type: string
+          session_id: string | null
+          visitor_id: string | null
+          page_url: string | null
+          referrer: string | null
+          utm_source: string | null
+          utm_medium: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_term: string | null
+          fbclid: string | null
+          ttclid: string | null
+          gclid: string | null
+          device_type: string | null
+          browser: string | null
+          country: string | null
+          ip_address: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          funnel_id?: string | null
+          node_id: string
+          event_type: string
+          session_id?: string | null
+          visitor_id?: string | null
+          page_url?: string | null
+          referrer?: string | null
+          utm_source?: string | null
+          utm_medium?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_term?: string | null
+          fbclid?: string | null
+          ttclid?: string | null
+          gclid?: string | null
+          device_type?: string | null
+          browser?: string | null
+          country?: string | null
+          ip_address?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          funnel_id?: string | null
+          node_id?: string
+          event_type?: string
+          session_id?: string | null
+          visitor_id?: string | null
+          page_url?: string | null
+          referrer?: string | null
+          utm_source?: string | null
+          utm_medium?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_term?: string | null
+          fbclid?: string | null
+          ttclid?: string | null
+          gclid?: string | null
+          device_type?: string | null
+          browser?: string | null
+          country?: string | null
+          ip_address?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_events_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       activity_logs: {
         Row: {
           action: string
