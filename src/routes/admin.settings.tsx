@@ -3,8 +3,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Settings as SettingsIcon, CreditCard, Mail, Plug, ShieldCheck, Save, Type, Palette, Link as LinkIcon, Key, Hash, CloudLightning, Play, AlertCircle } from "lucide-react";
 import { Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 
 export const Route = createFileRoute("/admin/settings")({ component: Page });
 
@@ -52,21 +50,7 @@ function loadSettings(): SettingsShape {
   }
 }
 
-const deployServerFn = createServerFn({ method: "POST" })
-  .inputValidator(
-    z.string().refine(
-      (url) => url.startsWith("https://api.vercel.com/"),
-      { message: "URL do Deploy Hook inválida" }
-    )
-  )
-  .handler(async ({ data: url }) => {
-    const res = await fetch(url, { method: "POST" });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Erro na Vercel (status ${res.status}): ${text}`);
-    }
-    return { success: true };
-  });
+
 
 function Page() {
   const [tab, setTab] = useState<typeof TABS[number]["id"]>("general");
@@ -95,11 +79,11 @@ function Page() {
     }
     setDeploying(true);
     try {
-      await deployServerFn({ data: url });
+      await fetch(url, { method: "POST", mode: "no-cors" });
       toast.success("Deploy disparado com sucesso na Vercel!");
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err.message || "Erro ao conectar com a Vercel.");
+      toast.error("Erro ao conectar com a Vercel.");
     } finally {
       setDeploying(false);
     }
