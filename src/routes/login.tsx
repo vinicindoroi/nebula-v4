@@ -1,23 +1,39 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Sparkles, Mail, Lock, ArrowRight, User as UserIcon } from "lucide-react";
+import { Orbit, Mail, Lock, ArrowRight, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
+type LoginSearch = {
+  mode?: "signin" | "signup";
+};
+
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>): LoginSearch => {
+    return {
+      mode: (search.mode === "signup" || search.mode === "signin") ? search.mode : undefined,
+    };
+  },
   component: LoginPage,
   head: () => ({ meta: [{ title: "Entrar — Membros" }] }),
 });
 
 function LoginPage() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const { session } = useAuth();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(search.mode || "signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (search.mode) {
+      setMode(search.mode);
+    }
+  }, [search.mode]);
 
   useEffect(() => {
     if (session) navigate({ to: "/dashboard" });
@@ -56,7 +72,7 @@ function LoginPage() {
         <div className="glass-strong rounded-2xl p-8 md:p-10">
           <div className="flex flex-col items-center text-center mb-6">
             <div className="h-12 w-12 rounded-xl gradient-primary flex items-center justify-center glow mb-4">
-              <Sparkles className="h-6 w-6 text-primary-foreground" />
+              <Orbit className="h-6 w-6 text-primary-foreground" />
             </div>
             <h1 className="text-2xl font-semibold">
               {mode === "signin" ? "Bem-vindo de volta" : "Crie sua conta"}

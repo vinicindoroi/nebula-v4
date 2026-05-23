@@ -47,13 +47,15 @@ export function useMemberProgress() {
       // Fetch all progress for this user with lesson + course info
       const { data: progress, error: progressError } = await db
         .from("lesson_progress")
-        .select("lesson_id, completed_at, lessons(id, title, position, course_id, module_id, duration_min, courses(id, title), modules(id, title))")
+        .select("lesson_id, completed_at, lessons(id, title, position, course_id, module_id, duration_min, courses(id, title, status), modules(id, title))")
         .eq("user_id", user!.id)
         .order("completed_at", { ascending: false });
 
       if (progressError) throw progressError;
 
-      const items = (progress ?? []) as any[];
+      const items = ((progress ?? []) as any[]).filter(
+        (i) => !i.lessons?.courses || i.lessons.courses.status === "published"
+      );
 
       // --- STREAK CALCULATION ---
       const streak = computeStreak(items);

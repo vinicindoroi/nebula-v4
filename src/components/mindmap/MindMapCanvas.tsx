@@ -78,7 +78,7 @@ function stripInternalProps(nodes: Node[]): Node[] {
 
 interface MindMapCanvasProps {
   funnel: Funnel;
-  onSave: (nodes: Node[], edges: Edge[], viewport: Viewport) => void;
+  onSave: (funnelId: string, nodes: Node[], edges: Edge[], viewport: Viewport) => void;
   isSaving: boolean;
   onRegisterFlush?: (flush: () => void) => void;
 }
@@ -223,11 +223,13 @@ export function MindMapCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Min
   const edgesRef = useRef(edges);
   const viewportRef = useRef<Viewport>(funnel.viewport || { x: 0, y: 0, zoom: 1 });
   const onSaveRef = useRef(onSave);
+  const funnelIdRef = useRef(funnel.id);
 
   // Keep refs in sync — these run on every render
   nodesRef.current = nodes;
   edgesRef.current = edges;
   onSaveRef.current = onSave;
+  funnelIdRef.current = funnel.id;
   collapsedNodesRef.current = collapsedNodes;
 
   // Track viewport via onMoveEnd so we always have a safe copy
@@ -262,7 +264,7 @@ export function MindMapCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Min
 
     lastSavedSnapshotRef.current = snapshot;
     console.log('[MindMap] Saving', cleanNodes.length, 'nodes,', curEdges.length, 'edges');
-    onSaveRef.current(cleanNodes, curEdges, viewport);
+    onSaveRef.current(funnelIdRef.current, cleanNodes, curEdges, viewport);
   }, [safeGetViewport]);
 
   // Debounced save — resets on every change
@@ -308,7 +310,7 @@ export function MindMapCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Min
       if (snapshot !== lastSavedSnapshotRef.current) {
         console.log('[MindMap] Flushing on unmount:', cleanNodes.length, 'nodes');
         lastSavedSnapshotRef.current = snapshot;
-        onSaveRef.current(cleanNodes, curEdges, viewportRef.current);
+        onSaveRef.current(funnelIdRef.current, cleanNodes, curEdges, viewportRef.current);
       }
     };
   }, []);

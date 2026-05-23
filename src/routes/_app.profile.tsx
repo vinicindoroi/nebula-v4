@@ -3,11 +3,12 @@ import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Award, Flame, Star, Trophy, Zap, Target, User, Mail, MapPin, Phone, FileText,
-  Save, Calendar, BadgeCheck, Camera, Instagram,
+  Save, Calendar, BadgeCheck, Camera, Instagram, BookOpen, Rocket, Compass, Lock, Check,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCourses } from "@/hooks/use-courses";
+import { useMemberProgress } from "@/hooks/use-member-progress";
 import { toast } from "sonner";
 import { Field, inputClass } from "@/components/admin/Modal";
 
@@ -16,19 +17,84 @@ export const Route = createFileRoute("/_app/profile")({
   head: () => ({ meta: [{ title: "Perfil — Membros" }] }),
 });
 
-const badges = [
-  { id: "streak", icon: Flame, label: "7 dias seguidos", color: "from-orange-500 to-pink-500", earned: true },
-  { id: "first", icon: Star, label: "Primeiro curso", color: "from-yellow-400 to-orange-500", earned: true },
-  { id: "top", icon: Trophy, label: "Top 10%", color: "from-purple-500 to-blue-500", earned: false },
-  { id: "marathon", icon: Zap, label: "Maratona", color: "from-cyan-400 to-blue-500", earned: false },
-  { id: "goal", icon: Target, label: "Meta atingida", color: "from-green-400 to-emerald-500", earned: false },
-  { id: "mentor", icon: Award, label: "Mentor", color: "from-fuchsia-500 to-purple-500", earned: false },
-];
+const ACHIEVEMENT_ICONS: Record<
+  string,
+  {
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+    bg: string;
+    glow: string;
+    border: string;
+    unlockedBorder: string;
+    unlockedBg: string;
+    animate?: string;
+  }
+> = {
+  first_lesson: {
+    icon: Target,
+    color: "text-pink-400",
+    bg: "bg-pink-500/10",
+    glow: "shadow-[0_0_20px_rgba(244,63,94,0.2)]",
+    border: "border-pink-500/20",
+    unlockedBorder: "hover:border-pink-500/40 border-pink-500/15",
+    unlockedBg: "bg-pink-500/[0.02] hover:bg-pink-500/[0.04]",
+  },
+  five_lessons: {
+    icon: BookOpen,
+    color: "text-teal-400",
+    bg: "bg-teal-500/10",
+    glow: "shadow-[0_0_20px_rgba(20,184,166,0.2)]",
+    border: "border-teal-500/20",
+    unlockedBorder: "hover:border-teal-500/40 border-teal-500/15",
+    unlockedBg: "bg-teal-500/[0.02] hover:bg-teal-500/[0.04]",
+  },
+  twenty_lessons: {
+    icon: Rocket,
+    color: "text-indigo-400",
+    bg: "bg-indigo-500/10",
+    glow: "shadow-[0_0_20px_rgba(99,102,241,0.2)]",
+    border: "border-indigo-500/20",
+    unlockedBorder: "hover:border-indigo-500/40 border-indigo-500/15",
+    unlockedBg: "bg-indigo-500/[0.02] hover:bg-indigo-500/[0.04]",
+    animate: "group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform duration-300",
+  },
+  streak_3: {
+    icon: Flame,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+    glow: "shadow-[0_0_20px_rgba(245,158,11,0.2)]",
+    border: "border-amber-500/20",
+    unlockedBorder: "hover:border-amber-500/40 border-amber-500/15",
+    unlockedBg: "bg-amber-500/[0.02] hover:bg-amber-500/[0.04]",
+    animate: "group-hover:scale-110 transition-transform duration-300",
+  },
+  streak_7: {
+    icon: Zap,
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/10",
+    glow: "shadow-[0_0_20px_rgba(234,179,8,0.2)]",
+    border: "border-yellow-500/20",
+    unlockedBorder: "hover:border-yellow-500/40 border-yellow-500/15",
+    unlockedBg: "bg-yellow-500/[0.02] hover:bg-yellow-500/[0.04]",
+    animate: "group-hover:scale-110 transition-transform duration-300",
+  },
+  explorer: {
+    icon: Compass,
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+    glow: "shadow-[0_0_20px_rgba(6,182,212,0.2)]",
+    border: "border-cyan-500/20",
+    unlockedBorder: "hover:border-cyan-500/40 border-cyan-500/15",
+    unlockedBg: "bg-cyan-500/[0.02] hover:bg-cyan-500/[0.04]",
+    animate: "group-hover:rotate-45 transition-transform duration-500",
+  },
+};
 
 function ProfilePage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { data: courses = [] } = useCourses();
+  const { data: memberProgress } = useMemberProgress();
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -116,7 +182,8 @@ function ProfilePage() {
 
   const completedCourses = courses.filter((c) => c.progress === 100).length;
   const totalCompletedLessons = courses.reduce((s, c) => s + c.completedLessons, 0);
-  const earnedBadges = badges.filter((b) => b.earned).length;
+  const achievements = memberProgress?.achievements ?? [];
+  const earnedBadges = achievements.filter((a) => a.unlocked).length;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto w-full">
@@ -180,7 +247,7 @@ function ProfilePage() {
         <div className="relative mt-6 grid grid-cols-3 gap-3 pt-6 border-t border-white/5">
           <MiniStat label="Cursos completos" value={completedCourses} />
           <MiniStat label="Aulas assistidas" value={totalCompletedLessons} />
-          <MiniStat label="Conquistas" value={`${earnedBadges}/${badges.length}`} />
+          <MiniStat label="Conquistas" value={`${earnedBadges}/${achievements.length || 6}`} />
         </div>
       </section>
 
@@ -248,27 +315,61 @@ function ProfilePage() {
           <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold">Conquistas</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{earnedBadges} de {badges.length} desbloqueadas</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{earnedBadges} de {achievements.length || 6} desbloqueadas</p>
             </div>
             <Trophy className="h-4 w-4 text-amber-400" />
           </div>
           <div className="p-4 grid grid-cols-3 gap-2">
-            {badges.map((b) => {
-              const Icon = b.icon;
+            {achievements.map((a) => {
+              const cfg = ACHIEVEMENT_ICONS[a.id] || {
+                icon: Award,
+                color: "text-amber-400",
+                bg: "bg-amber-500/10",
+                glow: "shadow-[0_0_20px_rgba(245,158,11,0.2)]",
+                border: "border-amber-500/20",
+                unlockedBorder: "hover:border-amber-500/40 border-amber-500/15",
+                unlockedBg: "bg-amber-500/[0.02] hover:bg-amber-500/[0.04]",
+              };
+              const Icon = cfg.icon;
+
               return (
                 <div
-                  key={b.id}
-                  className={`rounded-xl border p-3 flex flex-col items-center text-center transition ${
-                    b.earned
-                      ? "border-white/10 bg-white/[0.03]"
-                      : "border-white/5 bg-white/[0.01] opacity-40 grayscale"
+                  key={a.id}
+                  className={`group relative rounded-xl border p-3 flex flex-col items-center text-center transition-all duration-300 select-none ${
+                    a.unlocked
+                      ? `${cfg.unlockedBorder} ${cfg.unlockedBg} ${cfg.glow}`
+                      : "border-white/5 bg-white/[0.01] opacity-40 grayscale hover:opacity-60 transition"
                   }`}
-                  title={b.label}
                 >
-                  <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${b.color} flex items-center justify-center mb-1.5 shadow-lg`}>
-                    <Icon className="h-4 w-4 text-white" />
+                  <div className={`relative h-10 w-10 rounded-xl flex items-center justify-center mb-1.5 shadow-lg transition-all duration-300 ${
+                    a.unlocked
+                      ? `${cfg.bg} ${cfg.glow} group-hover:scale-105 group-hover:rotate-3`
+                      : "bg-white/5 text-muted-foreground/30 ring-dashed"
+                  }`}>
+                    <Icon className={`h-4.5 w-4.5 ${a.unlocked ? cfg.color : "text-muted-foreground/20"} ${cfg.animate || ""}`} />
+                    {!a.unlocked && (
+                      <div className="absolute inset-0 bg-black/30 backdrop-blur-[0.5px] rounded-xl flex items-center justify-center">
+                        <Lock className="h-3 w-3 text-muted-foreground/40" />
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[10px] text-muted-foreground leading-tight">{b.label}</div>
+                  <div className="text-[10px] text-muted-foreground leading-tight truncate w-full">{a.title}</div>
+
+                  {/* Premium pure CSS Tooltip */}
+                  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 w-48 -translate-x-1/2 scale-95 rounded-xl border border-white/[0.08] bg-black/95 p-2.5 text-center opacity-0 shadow-2xl backdrop-blur-md transition-all duration-200 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100">
+                    <p className={`font-bold text-[11px] mb-0.5 ${a.unlocked ? cfg.color : "text-muted-foreground"}`}>{a.title}</p>
+                    <p className="text-[9px] text-muted-foreground/80 leading-relaxed mb-1">{a.description}</p>
+                    {a.unlocked ? (
+                      <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                        Desbloqueado!
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-muted-foreground/70 bg-white/[0.04] px-1.5 py-0.5 rounded-full">
+                        Bloqueado · {a.progress ?? 0}%
+                      </span>
+                    )}
+                    <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 bg-black/95 border-r border-b border-white/[0.08] rotate-45" />
+                  </div>
                 </div>
               );
             })}

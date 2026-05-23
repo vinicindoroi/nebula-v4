@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Edit3, Ticket, Search, Hash, Percent, DollarSign, Calendar, Sparkles, Copy, Check } from "lucide-react";
+import { Plus, Trash2, Edit3, Ticket, Search, Hash, Percent, DollarSign, Calendar, Copy, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Modal, Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
@@ -72,7 +72,7 @@ function Page() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Stat icon={Ticket} label="Total" value={rows.length} />
-        <Stat icon={Sparkles} label="Ativos" value={active} accent="emerald" />
+        <Stat icon={Percent} label="Ativos" value={active} accent="emerald" />
         <Stat icon={Hash} label="Resgates" value={totalUses} />
       </div>
 
@@ -268,7 +268,7 @@ function CouponModal({ initial, onClose, onSaved }: { initial: Partial<Coupon>; 
             className="shrink-0 px-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-xs flex items-center gap-1.5 transition"
             title="Gerar código"
           >
-            <Sparkles className="h-3.5 w-3.5" />Gerar
+            <Hash className="h-3.5 w-3.5" />Gerar
           </button>
         </div>
       </Field>

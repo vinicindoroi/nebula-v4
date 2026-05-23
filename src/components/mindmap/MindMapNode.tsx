@@ -63,7 +63,7 @@ export function MindMapNode({ id, data, selected }: NodeProps<Node<MindMapNodeDa
   const theme = data._theme;
   const isFloating = data._isFloating === true;
   const isDropTarget = data._isDropTarget === true;
-  const bgColor = isFloating ? 'transparent' : (data.color || (theme?.depthColors[data.depth ?? 1]) || '#2d2f3d');
+  const bgColor = isFloating ? 'transparent' : (data.color || data.backgroundColor || (theme?.depthColors[data.depth ?? 1]) || '#2d2f3d');
   const fontSize = data.fontSize || (isRoot ? 18 : 14);
   const shape = isFloating ? 'rounded' : (data.shape || 'rounded');
   const borderStyle = data.borderStyle || 'solid';

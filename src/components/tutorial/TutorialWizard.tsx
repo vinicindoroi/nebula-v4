@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   GraduationCap,
   Users,
-  Sparkles,
+  Orbit,
   Bookmark,
   MessageSquare,
   StickyNote,
@@ -47,7 +47,7 @@ const STEPS: TutorialStep[] = [
     id: "welcome",
     title: "Bem-vindo à plataforma",
     description: "Sua área exclusiva de aprendizado e comunidade.",
-    icon: Sparkles,
+    icon: Orbit,
     accentColor: "bg-primary/10 text-primary",
     content: (
       <div className="space-y-4">
@@ -110,12 +110,12 @@ const STEPS: TutorialStep[] = [
     id: "ready",
     title: "Tudo pronto!",
     description: "Você está preparado para começar.",
-    icon: Sparkles,
+    icon: Orbit,
     accentColor: "bg-emerald-500/10 text-emerald-400",
     content: (
       <div className="space-y-4 text-center py-4">
         <div className="h-16 w-16 mx-auto rounded-2xl gradient-primary flex items-center justify-center shadow-[0_8px_32px_-8px_oklch(0.65_0.22_290/0.5)]">
-          <Sparkles className="h-7 w-7 text-primary-foreground" />
+          <Orbit className="h-7 w-7 text-primary-foreground" />
         </div>
         <div>
           <p className="text-sm font-medium">Bons estudos!</p>

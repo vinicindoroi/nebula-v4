@@ -6,10 +6,12 @@ import { Color } from "@tiptap/extension-color";
 import TextStyle from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
+import Link from "@tiptap/extension-link";
 import { useEffect, useRef, useState } from "react";
 import {
   Bold, Italic, Underline as UnderlineIcon, Heading1, Heading2, Heading3,
   List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Highlighter,
+  Link2 as LinkIcon,
 } from "lucide-react";
 
 const COLORS = [
@@ -41,6 +43,12 @@ export function RichTextEditor({ content, onChange, placeholder = "Escreva aqui.
       Color,
       Highlight.configure({ multicolor: true }),
       Placeholder.configure({ placeholder }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          class: "text-primary underline hover:text-primary/80 cursor-pointer",
+        },
+      }),
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -53,6 +61,29 @@ export function RichTextEditor({ content, onChange, placeholder = "Escreva aqui.
       },
     },
   });
+
+  const setLink = () => {
+    if (!editor) return;
+    const previousUrl = editor.getAttributes("link").href;
+    const url = window.prompt("Digite o link (URL):", previousUrl);
+
+    if (url === null) {
+      return;
+    }
+
+    if (url === "") {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+      return;
+    }
+
+    // Basic URL validation/prefixing if missing protocol
+    let finalUrl = url.trim();
+    if (!/^https?:\/\//i.test(finalUrl) && !/^mailto:/i.test(finalUrl) && !/^tel:/i.test(finalUrl)) {
+      finalUrl = `https://${finalUrl}`;
+    }
+
+    editor.chain().focus().extendMarkRange("link").setLink({ href: finalUrl }).run();
+  };
 
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
@@ -94,6 +125,9 @@ export function RichTextEditor({ content, onChange, placeholder = "Escreva aqui.
         </ToolBtn>
         <ToolBtn active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Sublinhado">
           <UnderlineIcon className="h-4 w-4" />
+        </ToolBtn>
+        <ToolBtn active={editor.isActive("link")} onClick={setLink} title="Inserir Link">
+          <LinkIcon className="h-4 w-4" />
         </ToolBtn>
 
         <div className="w-px h-5 bg-white/10 mx-1" />

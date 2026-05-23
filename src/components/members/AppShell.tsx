@@ -1,7 +1,7 @@
 import { Link, useRouterState, Outlet, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, GraduationCap, Users, User, Settings, Search, Bell,
-  Menu, X, Sparkles, LogOut, Shield, MessageSquare, Bookmark, GitBranch,
+  Menu, X, Orbit, LogOut, Shield, MessageSquare, Bookmark, GitBranch,
   PanelLeftClose, PanelLeftOpen, StickyNote, HelpCircle,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
@@ -91,11 +91,11 @@ export function AppShell() {
   const siteSettings = useMemo(() => {
     try {
       const raw = localStorage.getItem("admin_settings_v1");
-      if (!raw) return { name: "Membros", logoUrl: "", primaryColor: "#8b5cf6" };
+      if (!raw) return { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6" };
       const parsed = JSON.parse(raw);
-      return { name: "Membros", logoUrl: "", primaryColor: "#8b5cf6", ...parsed.general };
+      return { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6", ...parsed.general };
     } catch {
-      return { name: "Membros", logoUrl: "", primaryColor: "#8b5cf6" };
+      return { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6" };
     }
   }, []);
 
@@ -129,7 +129,7 @@ export function AppShell() {
               <img src={siteSettings.logoUrl} alt={siteSettings.name} className="h-8 w-8 rounded-lg object-cover" />
             ) : (
               <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary-foreground" />
+                <Orbit className="h-4 w-4 text-primary-foreground" />
               </div>
             )}
           </Link>
@@ -190,7 +190,7 @@ export function AppShell() {
                 <img src={siteSettings.logoUrl} alt={siteSettings.name} className="h-10 w-10 rounded-xl object-cover shadow-[0_0_24px_-4px_oklch(0.65_0.22_290/0.6)]" />
               ) : (
                 <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center shadow-[0_0_24px_-4px_oklch(0.65_0.22_290/0.6)]">
-                  <Sparkles className="h-5 w-5 text-primary-foreground" />
+                  <Orbit className="h-5 w-5 text-primary-foreground" />
                 </div>
               )}
               <div>
@@ -281,7 +281,7 @@ export function AppShell() {
               <img src={siteSettings.logoUrl} alt={siteSettings.name} className="h-10 w-10 rounded-xl object-cover" />
             ) : (
               <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-primary-foreground" />
+                <Orbit className="h-5 w-5 text-primary-foreground" />
               </div>
             )}
             <div>

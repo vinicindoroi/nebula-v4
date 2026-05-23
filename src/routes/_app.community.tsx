@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import {
   MessageCircle, Heart, Trash2, Send, Image as ImageIcon,
-  X, ChevronDown, ChevronUp, CornerDownRight, Sparkles, Bookmark,
+  X, ChevronDown, ChevronUp, CornerDownRight, Bookmark,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,7 +12,7 @@ import { MembersSidebar } from "@/components/members/MembersSidebar";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { notifyUser } from "@/lib/notify";
 import { useSavedPosts, useToggleSave } from "@/hooks/use-saved-posts";
-import { useAddXp } from "@/hooks/use-xp";
+import { useAddXp, getLevel, useXp } from "@/hooks/use-xp";
 
 export const Route = createFileRoute("/_app/community")({
   component: CommunityPage,
@@ -26,7 +26,7 @@ type Comment = {
   content: string;
   image_url: string | null;
   created_at: string;
-  author: { full_name: string | null; avatar_url: string | null; instagram: string | null } | null;
+  author: { full_name: string | null; avatar_url: string | null; instagram: string | null; xp?: number | null } | null;
 };
 
 type Post = {
@@ -35,7 +35,7 @@ type Post = {
   content: string;
   image_url: string | null;
   created_at: string;
-  author: { full_name: string | null; avatar_url: string | null; instagram: string | null } | null;
+  author: { full_name: string | null; avatar_url: string | null; instagram: string | null; xp?: number | null } | null;
   likes: number;
   liked: boolean;
   comments: Comment[];
@@ -55,6 +55,7 @@ function CommunityPage() {
   const { data: savedPosts = [] } = useSavedPosts();
   const toggleSave = useToggleSave();
   const addXp = useAddXp();
+  const { data: myXp = 0 } = useXp();
 
   // Realtime
   useEffect(() => {
@@ -82,7 +83,7 @@ function CommunityPage() {
         db.from("posts").select("*").order("created_at", { ascending: false }).limit(50),
         db.from("post_likes").select("post_id, user_id"),
         db.from("comments").select("*").order("created_at", { ascending: true }),
-        db.from("profiles").select("id, full_name, avatar_url, instagram"),
+        db.from("profiles").select("id, full_name, avatar_url, instagram, xp"),
       ]);
       if (pRes.error) throw pRes.error;
       const profs = new Map((profRes.data ?? []).map((p: any) => [p.id, p]));
@@ -179,12 +180,18 @@ function CommunityPage() {
   const remaining = MAX - text.length;
 
   return (
-    <div className="flex justify-center gap-6">
-      <div className="w-full max-w-2xl space-y-5 py-2">
+    <div className="flex justify-center gap-6 max-w-7xl mx-auto px-4">
+      {/* Coluna Esquerda: Perfil & XP */}
+      <div className="hidden lg:block w-64 shrink-0">
+        <ProfileSidebarWidget />
+      </div>
+
+      {/* Coluna Central: Feed */}
+      <div className="flex-1 max-w-2xl space-y-5 py-2 min-w-0">
         {/* Header */}
         <div className="text-center space-y-1 pb-2">
           <div className="inline-flex items-center gap-2 text-xs text-primary/80 font-medium">
-            <Sparkles className="h-3.5 w-3.5" />
+            <MessageCircle className="h-3.5 w-3.5" />
             <span>{posts.length} publicações</span>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Comunidade</h1>
@@ -195,7 +202,7 @@ function CommunityPage() {
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-sm overflow-hidden">
           <div className="px-5 pt-4 pb-3">
             <div className="flex items-center gap-3 mb-3">
-              <Avatar initials={initials} />
+              <Avatar initials={initials} xp={myXp} />
               <span className="text-sm font-medium text-foreground/80">Nova publicação</span>
             </div>
             <RichTextEditor
@@ -273,12 +280,155 @@ function CommunityPage() {
   );
 }
 
+/* ─── ProfileSidebarWidget ─── */
+
+function ProfileSidebarWidget() {
+  const { user } = useAuth();
+  const { data: xp = 0 } = useXp();
+
+  const { data: myProfile } = useQuery({
+    queryKey: ["profile", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url, instagram, plan")
+        .eq("id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const name = myProfile?.full_name || user?.user_metadata?.full_name || "Membro";
+  const initials = name.slice(0, 2).toUpperCase();
+  const levelInfo = getLevel(xp);
+
+  const getRankColor = (lvl: number) => {
+    if (lvl >= 8) return "from-yellow-400 to-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.4)]";
+    if (lvl >= 7) return "from-fuchsia-500 to-purple-600 shadow-[0_0_12px_rgba(168,85,247,0.4)]";
+    if (lvl >= 6) return "from-violet-500 to-indigo-600 shadow-[0_0_12px_rgba(99,102,241,0.4)]";
+    if (lvl >= 5) return "from-blue-500 to-cyan-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]";
+    if (lvl >= 4) return "from-teal-500 to-emerald-500";
+    if (lvl >= 3) return "from-emerald-500 to-green-500";
+    if (lvl >= 2) return "from-orange-500 to-red-500";
+    return "from-slate-500 to-slate-600";
+  };
+
+  const rankColor = getRankColor(levelInfo.level);
+
+  return (
+    <div className="sticky top-4 rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-sm overflow-hidden shadow-xl">
+      {/* Banner Capa */}
+      <div className="h-20 w-full bg-gradient-to-r from-violet-600/30 via-primary/30 to-pink-600/30 relative">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
+      </div>
+
+      {/* Avatar flutuante e Informações básicas */}
+      <div className="relative px-4 pb-4 pt-10 text-center flex flex-col items-center border-b border-white/[0.06]">
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2">
+          {myProfile?.avatar_url ? (
+            <img
+              src={myProfile.avatar_url}
+              alt={name}
+              className="h-16 w-16 rounded-2xl object-cover border-2 border-background shadow-lg ring-2 ring-white/10"
+            />
+          ) : (
+            <div className="h-16 w-16 rounded-2xl gradient-primary flex items-center justify-center text-xl font-bold text-white border-2 border-background shadow-lg ring-2 ring-white/10">
+              {initials}
+            </div>
+          )}
+        </div>
+
+        <h3 className="text-sm font-semibold truncate max-w-full text-foreground/90">{name}</h3>
+        {myProfile?.instagram && (
+          <a
+            href={`https://instagram.com/${myProfile.instagram.replace("@", "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] text-pink-400/80 hover:text-pink-400 transition mt-0.5 flex items-center gap-1"
+          >
+            @{myProfile.instagram.replace("@", "")}
+          </a>
+        )}
+        {myProfile?.plan && myProfile.plan !== "Free" && (
+          <span className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] font-semibold text-primary uppercase tracking-wider">
+            {myProfile.plan}
+          </span>
+        )}
+      </div>
+
+      {/* XP e Gamificação */}
+      <div className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold text-white bg-gradient-to-r ${rankColor}`}>
+              Nível {levelInfo.level}
+            </span>
+            <span className="text-[11px] font-medium text-muted-foreground/80">{levelInfo.title}</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+            {levelInfo.currentXp} / {levelInfo.nextLevelXp} XP
+          </span>
+        </div>
+
+        {/* Barra de Progresso */}
+        <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden border border-white/[0.04] p-[1px]">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${rankColor} transition-all duration-500`}
+            style={{ width: `${Math.min(100, (levelInfo.currentXp / levelInfo.nextLevelXp) * 100)}%` }}
+          />
+        </div>
+
+        <p className="text-[10px] text-muted-foreground/50 text-center leading-normal">
+          Ganhe XP interagindo na comunidade e completando aulas!
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Avatar ─── */
 
-function Avatar({ initials, size = "md" }: { initials: string; size?: "sm" | "md" }) {
-  const cls = size === "sm" ? "h-7 w-7 text-[10px]" : "h-10 w-10 text-xs";
+function LevelBadge({ xp }: { xp: number }) {
+  const levelInfo = getLevel(xp);
+  const getRankColor = (lvl: number) => {
+    if (lvl >= 8) return "from-yellow-400/20 to-amber-500/20 text-amber-300 border-amber-500/30";
+    if (lvl >= 7) return "from-fuchsia-500/20 to-purple-600/20 text-purple-300 border-purple-500/30";
+    if (lvl >= 6) return "from-violet-500/20 to-indigo-600/20 text-indigo-300 border-indigo-500/30";
+    if (lvl >= 5) return "from-blue-500/20 to-cyan-500/20 text-blue-300 border-blue-500/30";
+    if (lvl >= 4) return "from-teal-500/20 to-emerald-500/20 text-emerald-300 border-teal-500/30";
+    if (lvl >= 3) return "from-emerald-500/20 to-green-500/20 text-green-300 border-emerald-500/30";
+    if (lvl >= 2) return "from-orange-500/20 to-red-500/20 text-orange-300 border-orange-500/30";
+    return "from-slate-500/10 to-slate-600/10 text-slate-400 border-slate-500/20";
+  };
+
   return (
-    <div className={`${cls} rounded-full gradient-primary flex items-center justify-center font-semibold text-primary-foreground shrink-0 ring-2 ring-primary/20`}>
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full border text-[9px] font-semibold bg-gradient-to-r ${getRankColor(levelInfo.level)}`}>
+      Lv. {levelInfo.level} • {levelInfo.title}
+    </span>
+  );
+}
+
+function Avatar({ initials, size = "md", xp = 0 }: { initials: string; size?: "sm" | "md"; xp?: number }) {
+  const levelInfo = getLevel(xp);
+  const cls = size === "sm" ? "h-7 w-7 text-[10px]" : "h-10 w-10 text-xs";
+
+  const getRingColor = (lvl: number) => {
+    if (lvl >= 8) return "ring-amber-500/40 shadow-[0_0_8px_rgba(245,158,11,0.3)]";
+    if (lvl >= 7) return "ring-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)]";
+    if (lvl >= 6) return "ring-indigo-500/40 shadow-[0_0_8px_rgba(99,102,241,0.3)]";
+    if (lvl >= 5) return "ring-blue-500/30 shadow-[0_0_6px_rgba(59,130,246,0.25)]";
+    if (lvl >= 4) return "ring-teal-500/30";
+    if (lvl >= 3) return "ring-emerald-500/30";
+    if (lvl >= 2) return "ring-orange-500/30";
+    return "ring-white/10";
+  };
+
+  const ringCls = getRingColor(levelInfo.level);
+
+  return (
+    <div className={`${cls} rounded-full gradient-primary flex items-center justify-center font-semibold text-primary-foreground shrink-0 ring-2 ${ringCls}`}>
       {initials}
     </div>
   );
@@ -291,14 +441,21 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
   const name = post.author?.full_name || "Membro";
   const initial = name.slice(0, 2).toUpperCase();
   const mine = post.user_id === userId;
+  const xpValue = post.author?.xp ?? 0;
 
   return (
-    <article className="rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-sm overflow-hidden hover:border-white/[0.12] transition-all duration-200 group">
+    <article className="rounded-2xl border border-white/[0.06] bg-white/[0.015] backdrop-blur-sm overflow-hidden hover:bg-white/[0.02] hover:border-white/[0.09] hover:shadow-[0_8px_32px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 group">
       {/* Author header */}
-      <div className="px-5 pt-5 pb-0 flex items-center gap-3">
-        <Avatar initials={initial} />
+      <div className="px-5 pt-5 pb-0 flex items-center gap-3 relative">
+        {showComments && (
+          <div className="absolute top-[52px] bottom-0 left-[39px] w-[1.5px] bg-white/5" />
+        )}
+        <Avatar initials={initial} xp={xpValue} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{name}</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-foreground/90 truncate">{name}</span>
+            <LevelBadge xp={xpValue} />
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground/70">{formatTime(post.created_at)}</span>
             {post.author?.instagram && (
@@ -342,18 +499,18 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
       <div className="px-5 py-3 mt-2 flex items-center gap-2">
         <button
           onClick={onLike}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
             post.liked
-              ? "text-rose-400 bg-rose-500/10 border border-rose-500/20"
+              ? "text-rose-400 bg-rose-500/10 border border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
               : "text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent"
           }`}
         >
-          <Heart className="h-4 w-4" fill={post.liked ? "currentColor" : "none"} />
+          <Heart className={`h-4 w-4 transition-transform duration-200 ${post.liked ? "scale-110" : ""}`} fill={post.liked ? "currentColor" : "none"} />
           <span className="tabular-nums">{post.likes || ""}</span>
         </button>
         <button
           onClick={() => setShowComments(!showComments)}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border duration-200 hover:scale-105 active:scale-95 ${
             showComments
               ? "text-foreground bg-white/5 border-white/10"
               : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-transparent"
@@ -365,9 +522,9 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
         </button>
         <button
           onClick={onSave}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ml-auto ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border duration-200 hover:scale-105 active:scale-95 ml-auto ${
             saved
-              ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+              ? "text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
               : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-transparent"
           }`}
         >
@@ -453,21 +610,30 @@ function CommentSection({ postId, postOwnerId, comments, userId }: { postId: str
     <div className="border-t border-white/[0.06] bg-white/[0.01]">
       {comments.length > 0 && (
         <div className="px-5 py-4 space-y-4 max-h-[360px] overflow-y-auto">
-          {comments.map((c) => {
+          {comments.map((c, index) => {
             const cName = c.author?.full_name || "Membro";
             const cInit = cName.slice(0, 2).toUpperCase();
             const isMine = c.user_id === userId;
+            const cXp = c.author?.xp ?? 0;
             return (
-              <div key={c.id} className="flex gap-2.5 group/comment">
-                <Avatar initials={cInit} size="sm" />
+              <div key={c.id} className="flex gap-2.5 group/comment relative">
+                <div className="flex flex-col items-center shrink-0 relative">
+                  <Avatar initials={cInit} size="sm" xp={cXp} />
+                  {index !== comments.length - 1 && (
+                    <div className="absolute top-8 bottom-0 w-[1.5px] bg-white/5" />
+                  )}
+                </div>
                 <div className="flex-1 min-w-0 rounded-xl bg-white/[0.03] border border-white/[0.06] px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold">{cName}</span>
-                    <span className="text-[10px] text-muted-foreground/50">{formatTime(c.created_at)}</span>
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-foreground/90">{cName}</span>
+                      <LevelBadge xp={cXp} />
+                      <span className="text-[10px] text-muted-foreground/50">{formatTime(c.created_at)}</span>
+                    </div>
                     {isMine && (
                       <button
                         onClick={() => deleteComment.mutate(c.id)}
-                        className="opacity-0 group-hover/comment:opacity-100 text-muted-foreground hover:text-red-400 p-0.5 rounded transition ml-auto"
+                        className="opacity-0 group-hover/comment:opacity-100 text-muted-foreground hover:text-red-400 p-0.5 rounded transition"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>

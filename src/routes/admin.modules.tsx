@@ -3,17 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Plus, Trash2, ChevronRight, Layers, BookOpen, Edit3, Video, Clock,
   GripVertical, ArrowUp, ArrowDown, FileText, Link as LinkIcon, Search,
-  Paperclip, Upload, X, Download, Crown,
+  Paperclip, Upload, X, Download, Crown, ImageIcon, Eye,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Modal, Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
 import { uploadAttachment, removeAttachment } from "@/lib/storage";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
 export const Route = createFileRoute("/admin/modules")({ component: Page });
 
 type Course = { id: string; title: string };
-type Module = { id: string; title: string; description: string | null; position: number; course_id: string; is_premium: boolean | null; offer_id: string | null };
+type Module = { id: string; title: string; description: string | null; position: number; course_id: string; is_premium: boolean | null; offer_id: string | null; cover_url: string | null };
 type Lesson = { id: string; title: string; description: string | null; video_url: string | null; duration: number | null; position: number; module_id: string; course_id: string; is_free: boolean | null; is_premium: boolean | null; offer_id: string | null };
 type Offer = { id: string; name: string };
 
@@ -291,8 +292,16 @@ function Page() {
           courseId={selected!}
           nextPos={(lessons[editingLesson.moduleId] ?? []).length}
           offers={offers}
+          modules={modules}
           onClose={() => setEditingLesson(null)}
-          onSaved={() => { const mid = editingLesson.moduleId; setEditingLesson(null); loadLessons(mid); }}
+          onSaved={(savedModuleId) => {
+            const originalMid = editingLesson.moduleId;
+            setEditingLesson(null);
+            loadLessons(originalMid);
+            if (savedModuleId && savedModuleId !== originalMid) {
+              loadLessons(savedModuleId);
+            }
+          }}
         />
       )}
     </div>
@@ -314,12 +323,12 @@ function Stat({ icon: Icon, label, value, text }: { icon: any; label: string; va
 }
 
 function ModuleModal({ initial, courseId, nextPos, offers, onClose, onSaved }: { initial: Partial<Module>; courseId: string; nextPos: number; offers: Offer[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ title: initial.title ?? "", description: initial.description ?? "", is_premium: initial.is_premium ?? false, offer_id: initial.offer_id ?? "" });
+  const [f, setF] = useState({ title: initial.title ?? "", description: initial.description ?? "", is_premium: initial.is_premium ?? false, offer_id: initial.offer_id ?? "", cover_url: initial.cover_url ?? "" });
   const [saving, setSaving] = useState(false);
   const save = async () => {
     if (!f.title.trim()) return toast.error("Informe um título");
     setSaving(true);
-    const payload = { title: f.title, description: f.description || null, course_id: courseId, is_premium: f.is_premium, offer_id: f.offer_id || null };
+    const payload = { title: f.title, description: f.description || null, course_id: courseId, is_premium: f.is_premium, offer_id: f.offer_id || null, cover_url: f.cover_url || null };
     const { error } = initial.id
       ? await supabase.from("modules").update(payload).eq("id", initial.id)
       : await supabase.from("modules").insert({ ...payload, position: nextPos });
@@ -350,6 +359,31 @@ function ModuleModal({ initial, courseId, nextPos, offers, onClose, onSaved }: {
       <Field label="Descrição" icon={FileText} hint="Opcional. Aparece como subtítulo do módulo.">
         <textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} rows={3} className={`${inputClass} resize-none`} />
       </Field>
+      <Field label="URL da capa" icon={ImageIcon} hint="URL de imagem para capa do módulo.">
+        <input value={f.cover_url} onChange={(e) => setF({ ...f, cover_url: e.target.value })} className={inputClass} placeholder="https://..." />
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+          <span>Recomendado: <span className="text-foreground">640 × 360 px</span> (16:9)</span>
+          <span>Máx. 1 MB · JPG ou WebP</span>
+        </div>
+      </Field>
+
+      {f.cover_url && (
+        <div className="mt-2">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+            <Eye className="h-3.5 w-3.5" />
+            Preview da capa
+          </label>
+          <div className="relative aspect-[16/10] w-full max-w-[280px] rounded-xl overflow-hidden border border-white/10 mx-auto mb-2">
+            <img src={f.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="absolute inset-x-3 bottom-3 text-left">
+              <h4 className="text-white font-semibold text-xs truncate">{f.title || "Título do módulo"}</h4>
+              <p className="text-[10px] text-white/60">Preview do card</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
         <Field label="Acesso" icon={Crown} hint="Quem pode acessar este módulo">
           <select value={f.is_premium ? (f.offer_id || "pro") : "free"} onChange={(e) => { const v = e.target.value; if (v === "free") { setF({ ...f, is_premium: false, offer_id: "" }); } else { setF({ ...f, is_premium: true, offer_id: v }); } }} className={inputClass}>
@@ -363,7 +397,7 @@ function ModuleModal({ initial, courseId, nextPos, offers, onClose, onSaved }: {
   );
 }
 
-function LessonModal({ initial, moduleId, courseId, nextPos, offers, onClose, onSaved }: { initial: Partial<Lesson>; moduleId: string; courseId: string; nextPos: number; offers: Offer[]; onClose: () => void; onSaved: () => void }) {
+function LessonModal({ initial, moduleId, courseId, nextPos, offers, modules, onClose, onSaved }: { initial: Partial<Lesson>; moduleId: string; courseId: string; nextPos: number; offers: Offer[]; modules: Module[]; onClose: () => void; onSaved: (savedModuleId?: string) => void }) {
   const [f, setF] = useState({
     title: initial.title ?? "",
     description: initial.description ?? "",
@@ -372,6 +406,7 @@ function LessonModal({ initial, moduleId, courseId, nextPos, offers, onClose, on
     is_free: initial.is_free ?? false,
     is_premium: initial.is_premium ?? false,
     offer_id: initial.offer_id ?? "",
+    module_id: initial.module_id ?? moduleId,
   });
   const [saving, setSaving] = useState(false);
 
@@ -429,6 +464,20 @@ function LessonModal({ initial, moduleId, courseId, nextPos, offers, onClose, on
   const save = async () => {
     if (!f.title.trim()) return toast.error("Informe um título");
     setSaving(true);
+
+    let targetPosition = initial.position ?? nextPos;
+    if (f.module_id !== moduleId) {
+      try {
+        const { count } = await supabase
+          .from("lessons")
+          .select("*", { count: "exact", head: true })
+          .eq("module_id", f.module_id);
+        targetPosition = count ?? 0;
+      } catch (err) {
+        console.error("Erro ao buscar posição:", err);
+      }
+    }
+
     const payload: any = {
       title: f.title,
       description: f.description || null,
@@ -437,15 +486,15 @@ function LessonModal({ initial, moduleId, courseId, nextPos, offers, onClose, on
       is_free: f.is_free,
       is_premium: f.is_premium,
       offer_id: f.offer_id || null,
-      module_id: moduleId,
+      module_id: f.module_id,
       course_id: courseId,
     };
     const { error } = initial.id
       ? await supabase.from("lessons").update(payload).eq("id", initial.id)
-      : await supabase.from("lessons").insert({ ...payload, position: nextPos });
+      : await supabase.from("lessons").insert({ ...payload, position: targetPosition });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Aula salva"); onSaved();
+    toast.success("Aula salva"); onSaved(f.module_id);
   };
   return (
     <Modal
@@ -467,8 +516,25 @@ function LessonModal({ initial, moduleId, courseId, nextPos, offers, onClose, on
       <Field label="Título" icon={FileText} required>
         <input autoFocus value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className={inputClass} placeholder="Ex: Introdução à arquitetura" />
       </Field>
+      <Field label="Módulo" icon={Layers} required>
+        <select
+          value={f.module_id}
+          onChange={(e) => setF({ ...f, module_id: e.target.value })}
+          className={inputClass}
+        >
+          {modules.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.title}
+            </option>
+          ))}
+        </select>
+      </Field>
       <Field label="Descrição" icon={FileText}>
-        <textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} rows={3} className={`${inputClass} resize-none`} />
+        <RichTextEditor
+          content={f.description ?? ""}
+          onChange={(html) => setF({ ...f, description: html })}
+          placeholder="Descreva o conteúdo desta aula..."
+        />
       </Field>
       <Field label="URL do vídeo" icon={Video} hint="YouTube, Vimeo, Bunny, etc.">
         <input value={f.video_url} onChange={(e) => setF({ ...f, video_url: e.target.value })} className={inputClass} placeholder="https://..." />

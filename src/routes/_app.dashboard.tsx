@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { TrendingUp, Clock, Award, Flame, Play, ArrowRight, BookOpen, Sparkles, Zap, Target, Trophy, Lock } from "lucide-react";
+import { TrendingUp, Clock, Award, Flame, Play, ArrowRight, BookOpen, Zap, Target, Trophy, Lock, Rocket, Compass, Check } from "lucide-react";
 import { useCourses } from "@/hooks/use-courses";
 import { useAuth } from "@/hooks/use-auth";
 import { useMemberProgress } from "@/hooks/use-member-progress";
@@ -19,6 +19,79 @@ function getGreeting(): string {
 }
 
 const DAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+const ACHIEVEMENT_ICONS: Record<
+  string,
+  {
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+    bg: string;
+    glow: string;
+    border: string;
+    unlockedBorder: string;
+    unlockedBg: string;
+    animate?: string;
+  }
+> = {
+  first_lesson: {
+    icon: Target,
+    color: "text-pink-400",
+    bg: "bg-pink-500/10",
+    glow: "shadow-[0_0_20px_rgba(244,63,94,0.2)]",
+    border: "border-pink-500/20",
+    unlockedBorder: "hover:border-pink-500/40 border-pink-500/15",
+    unlockedBg: "bg-pink-500/[0.02] hover:bg-pink-500/[0.04]",
+  },
+  five_lessons: {
+    icon: BookOpen,
+    color: "text-teal-400",
+    bg: "bg-teal-500/10",
+    glow: "shadow-[0_0_20px_rgba(20,184,166,0.2)]",
+    border: "border-teal-500/20",
+    unlockedBorder: "hover:border-teal-500/40 border-teal-500/15",
+    unlockedBg: "bg-teal-500/[0.02] hover:bg-teal-500/[0.04]",
+  },
+  twenty_lessons: {
+    icon: Rocket,
+    color: "text-indigo-400",
+    bg: "bg-indigo-500/10",
+    glow: "shadow-[0_0_20px_rgba(99,102,241,0.2)]",
+    border: "border-indigo-500/20",
+    unlockedBorder: "hover:border-indigo-500/40 border-indigo-500/15",
+    unlockedBg: "bg-indigo-500/[0.02] hover:bg-indigo-500/[0.04]",
+    animate: "group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform duration-300",
+  },
+  streak_3: {
+    icon: Flame,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+    glow: "shadow-[0_0_20px_rgba(245,158,11,0.2)]",
+    border: "border-amber-500/20",
+    unlockedBorder: "hover:border-amber-500/40 border-amber-500/15",
+    unlockedBg: "bg-amber-500/[0.02] hover:bg-amber-500/[0.04]",
+    animate: "group-hover:scale-110 transition-transform duration-300",
+  },
+  streak_7: {
+    icon: Zap,
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/10",
+    glow: "shadow-[0_0_20px_rgba(234,179,8,0.2)]",
+    border: "border-yellow-500/20",
+    unlockedBorder: "hover:border-yellow-500/40 border-yellow-500/15",
+    unlockedBg: "bg-yellow-500/[0.02] hover:bg-yellow-500/[0.04]",
+    animate: "group-hover:scale-110 transition-transform duration-300",
+  },
+  explorer: {
+    icon: Compass,
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+    glow: "shadow-[0_0_20px_rgba(6,182,212,0.2)]",
+    border: "border-cyan-500/20",
+    unlockedBorder: "hover:border-cyan-500/40 border-cyan-500/15",
+    unlockedBg: "bg-cyan-500/[0.02] hover:bg-cyan-500/[0.04]",
+    animate: "group-hover:rotate-45 transition-transform duration-500",
+  },
+};
 
 function Dashboard() {
   const { user } = useAuth();
@@ -54,7 +127,7 @@ function Dashboard() {
         <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-primary/80 mb-2">
-              <Sparkles className="h-3 w-3" />Visão geral
+              <Compass className="h-3 w-3" />Visão geral
             </div>
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
               {getGreeting()}, {name}
@@ -168,36 +241,100 @@ function Dashboard() {
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            {achievements.map((a) => (
-              <div
-                key={a.id}
-                className={`relative rounded-xl border p-3 text-center transition-all duration-300 ${
-                  a.unlocked
-                    ? "border-amber-500/20 bg-amber-500/[0.04] hover:bg-amber-500/[0.08]"
-                    : "border-white/[0.06] bg-white/[0.02] opacity-60"
-                }`}
-              >
-                <div className="text-2xl mb-1.5">{a.icon}</div>
-                <div className="text-[11px] font-medium leading-tight">{a.title}</div>
-                {!a.unlocked && a.progress !== undefined && (
-                  <div className="mt-2">
-                    <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                      <div className="h-full gradient-primary rounded-full" style={{ width: `${a.progress}%` }} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {achievements.map((a) => {
+              const cfg = ACHIEVEMENT_ICONS[a.id] || {
+                icon: Award,
+                color: "text-amber-400",
+                bg: "bg-amber-500/10",
+                glow: "shadow-[0_0_20px_rgba(245,158,11,0.2)]",
+                border: "border-amber-500/20",
+                unlockedBorder: "hover:border-amber-500/40 border-amber-500/15",
+                unlockedBg: "bg-amber-500/[0.02] hover:bg-amber-500/[0.04]",
+              };
+              const Icon = cfg.icon;
+
+              return (
+                <div
+                  key={a.id}
+                  className={`group relative rounded-2xl border p-4 text-center transition-all duration-300 flex flex-col items-center justify-between min-h-[145px] select-none ${
+                    a.unlocked
+                      ? `${cfg.unlockedBorder} ${cfg.unlockedBg} ${cfg.glow}`
+                      : "border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.02] hover:border-white/[0.08]"
+                  }`}
+                >
+                  {/* Backdrop light effect inside the card */}
+                  <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[0.01] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
+
+                  {/* Card content */}
+                  <div className="relative z-10 flex flex-col items-center w-full">
+                    {/* Icon holder */}
+                    <div className={`relative h-14 w-14 rounded-2xl flex items-center justify-center mb-3 ring-1 ring-white/[0.06] transition-all duration-300 ${
+                      a.unlocked
+                        ? `${cfg.bg} ${cfg.glow} group-hover:scale-105 group-hover:rotate-3`
+                        : "bg-white/[0.02] text-muted-foreground/30 ring-dashed"
+                    }`}>
+                      <Icon className={`h-6 w-6 ${a.unlocked ? cfg.color : "text-muted-foreground/20"} ${cfg.animate || ""}`} />
+
+                      {!a.unlocked && (
+                        <div className="absolute inset-0 bg-black/30 backdrop-blur-[0.5px] rounded-2xl flex items-center justify-center">
+                          <Lock className="h-3.5 w-3.5 text-muted-foreground/40" />
+                        </div>
+                      )}
                     </div>
-                    <div className="text-[9px] text-muted-foreground/50 mt-0.5">{a.current}/{a.target}</div>
+
+                    <div className="text-[11px] font-semibold tracking-wide text-foreground/90 leading-snug">{a.title}</div>
+                    <div className="text-[9px] text-muted-foreground/50 mt-1 leading-tight line-clamp-1">{a.description}</div>
                   </div>
-                )}
-                {a.unlocked && (
-                  <div className="absolute top-1.5 right-1.5 h-3.5 w-3.5 rounded-full bg-amber-500/20 flex items-center justify-center">
-                    <span className="text-[8px]">✓</span>
+
+                  {/* Unlocked top-right indicator badge */}
+                  {a.unlocked ? (
+                    <div className="absolute top-2.5 right-2.5 h-4.5 w-4.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.25)]">
+                      <Check className="h-2.5 w-2.5 text-emerald-400" strokeWidth={3} />
+                    </div>
+                  ) : (
+                    <div className="absolute top-2.5 right-2.5 h-4.5 w-4.5 rounded-full bg-white/[0.02] border border-white/[0.04] flex items-center justify-center">
+                      <Lock className="h-2.5 w-2.5 text-muted-foreground/20" />
+                    </div>
+                  )}
+
+                  {/* Progress bar or progress label */}
+                  <div className="w-full mt-3 relative z-10">
+                    {!a.unlocked && a.progress !== undefined ? (
+                      <div>
+                        <div className="h-1 w-full rounded-full bg-white/[0.04] overflow-hidden">
+                          <div className="h-full gradient-primary rounded-full transition-all duration-500" style={{ width: `${a.progress}%` }} />
+                        </div>
+                        <div className="flex justify-between items-center text-[9px] text-muted-foreground/40 mt-1.5 tabular-nums">
+                          <span>Progresso</span>
+                          <span>{a.current}/{a.target}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[9px] text-emerald-400/80 font-medium tracking-wide">
+                        Concluído
+                      </div>
+                    )}
                   </div>
-                )}
-                {!a.unlocked && (
-                  <Lock className="absolute top-1.5 right-1.5 h-3 w-3 text-muted-foreground/30" />
-                )}
-              </div>
-            ))}
+
+                  {/* Premium pure CSS Tooltip */}
+                  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 w-52 -translate-x-1/2 scale-95 rounded-xl border border-white/[0.08] bg-black/95 p-3 text-center opacity-0 shadow-2xl backdrop-blur-md transition-all duration-200 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100">
+                    <p className={`font-bold text-xs mb-1 ${a.unlocked ? cfg.color : "text-muted-foreground"}`}>{a.title}</p>
+                    <p className="text-[10px] text-muted-foreground/80 leading-relaxed mb-1.5">{a.description}</p>
+                    {a.unlocked ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        Desbloqueado!
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-muted-foreground/70 bg-white/[0.04] px-2 py-0.5 rounded-full">
+                        Bloqueado · {a.progress}%
+                      </span>
+                    )}
+                    <div className="absolute top-full left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1 bg-black/95 border-r border-b border-white/[0.08] rotate-45" />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

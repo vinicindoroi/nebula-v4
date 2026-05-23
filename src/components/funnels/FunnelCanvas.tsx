@@ -34,7 +34,7 @@ import { useFunnelAnalytics } from '@/hooks/useFunnelAnalytics';
 
 interface FunnelCanvasProps {
   funnel: Funnel;
-  onSave: (nodes: Node[], edges: Edge[], viewport: Viewport) => void;
+  onSave: (funnelId: string, nodes: Node[], edges: Edge[], viewport: Viewport) => void;
   isSaving?: boolean;
   onRegisterFlush?: (flush: () => void) => void;
 }
@@ -118,8 +118,8 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
   }, [reactFlowInstance, funnel.id, funnel.viewport]);
 
   // Ref that always holds the latest state for flush (avoids stale closures)
-  const latestFunnelStateRef = useRef({ nodes, edges, reactFlowInstance, onSave });
-  latestFunnelStateRef.current = { nodes, edges, reactFlowInstance, onSave };
+  const latestFunnelStateRef = useRef({ nodes, edges, reactFlowInstance, onSave, funnelId: funnel.id });
+  latestFunnelStateRef.current = { nodes, edges, reactFlowInstance, onSave, funnelId: funnel.id };
 
   // Stable flush function — reads from ref, never stale
   const flushSave = useCallback(() => {
@@ -127,13 +127,13 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
       clearTimeout(autosaveTimeoutRef.current);
       autosaveTimeoutRef.current = null;
     }
-    const { nodes: curNodes, edges: curEdges, reactFlowInstance: rfi, onSave: curOnSave } = latestFunnelStateRef.current;
+    const { nodes: curNodes, edges: curEdges, reactFlowInstance: rfi, onSave: curOnSave, funnelId: curFunnelId } = latestFunnelStateRef.current;
     if (!rfi) return;
     const viewport = rfi.getViewport();
     const snapshot = JSON.stringify({ nodes: curNodes, edges: curEdges, viewport });
     if (snapshot === lastSavedSnapshotRef.current) return;
     lastSavedSnapshotRef.current = snapshot;
-    curOnSave(curNodes, curEdges, viewport);
+    curOnSave(curFunnelId, curNodes, curEdges, viewport);
   }, []);
 
   // Debounced autosave to prevent losing edits on refresh/HMR

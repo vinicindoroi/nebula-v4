@@ -22,7 +22,7 @@ export function useCourses() {
     enabled: !!user,
     queryFn: async (): Promise<CourseWithProgress[]> => {
       const [coursesRes, lessonsRes, progressRes] = await Promise.all([
-        supabase.from("courses").select("*").order("created_at"),
+        supabase.from("courses").select("*").eq("status", "published").order("created_at"),
         supabase.from("lessons").select("id, course_id"),
         supabase.from("lesson_progress").select("lesson_id").eq("user_id", user!.id),
       ]);

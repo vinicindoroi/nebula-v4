@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Settings as SettingsIcon, CreditCard, Mail, Plug, ShieldCheck, Save, Type, Palette, Link as LinkIcon, Key, Hash, CloudLightning, Play, AlertCircle } from "lucide-react";
 import { Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
+import { createServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/admin/settings")({ component: Page });
 
@@ -18,7 +19,7 @@ type SettingsShape = {
 };
 
 const DEFAULTS: SettingsShape = {
-  general: { name: "Membros", logoUrl: "", primaryColor: "#8b5cf6" },
+  general: { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6" },
   payments: { gateway: "stripe", publicKey: "" },
   email: { smtpHost: "", sender: "" },
   integrations: { apiKey: "", webhookUrl: "" },
@@ -50,6 +51,22 @@ function loadSettings(): SettingsShape {
   }
 }
 
+const deployServerFn = createServerFn({ method: "POST" })
+  .validator((url: unknown) => {
+    if (typeof url !== "string" || !url.startsWith("https://api.vercel.com/")) {
+      throw new Error("URL do Deploy Hook inválida");
+    }
+    return url;
+  })
+  .handler(async ({ data: url }) => {
+    const res = await fetch(url, { method: "POST" });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Erro na Vercel (status ${res.status}): ${text}`);
+    }
+    return { success: true };
+  });
+
 function Page() {
   const [tab, setTab] = useState<typeof TABS[number]["id"]>("general");
   const [s, setS] = useState<SettingsShape>(DEFAULTS);
@@ -77,15 +94,11 @@ function Page() {
     }
     setDeploying(true);
     try {
-      const res = await fetch(url, { method: "POST" });
-      if (res.ok) {
-        toast.success("Deploy disparado com sucesso na Vercel!");
-      } else {
-        toast.error(`Falha ao disparar deploy: status ${res.status}`);
-      }
-    } catch (err) {
+      await deployServerFn({ data: url });
+      toast.success("Deploy disparado com sucesso na Vercel!");
+    } catch (err: any) {
       console.error(err);
-      toast.error("Erro ao conectar com a Vercel.");
+      toast.error(err.message || "Erro ao conectar com a Vercel.");
     } finally {
       setDeploying(false);
     }
@@ -311,29 +324,26 @@ function Page() {
                 <div className="border border-amber-500/10 bg-amber-500/[0.02] rounded-2xl p-5 space-y-3">
                   <div className="flex items-center gap-2.5 text-amber-500">
                     <AlertCircle className="h-4 w-4" />
-                    <h4 className="text-sm font-medium">Como desativar o deploy automático da Vercel?</h4>
+                    <h4 className="text-sm font-medium">Como evitar que deploys sumam ou sejam cancelados?</h4>
                   </div>
                   <p className="text-xs leading-relaxed text-muted-foreground">
-                    Por padrão, a Vercel realiza um novo deploy para cada commit enviado ao GitHub. Para fazer com que o deploy aconteça <strong>apenas</strong> quando você clicar no botão acima:
+                    Se você adicionou anteriormente o comando <code>echo "Skipping push build" && exit 0</code> na seção <strong>Ignored Build Step</strong> do painel da Vercel, todos os deploys (incluindo os disparados pelo botão) serão cancelados e sumirão do painel!
+                  </p>
+                  <p className="text-xs font-medium leading-relaxed text-amber-500/90">
+                    Para desativar deploys automáticos de commits do Git e permitir que apenas o botão acima funcione:
                   </p>
                   <ol className="text-xs space-y-2 text-muted-foreground list-decimal pl-4">
                     <li>
-                      Acesse o painel da <strong>Vercel</strong> e selecione o seu projeto.
+                      Já adicionamos o arquivo <code>vercel.json</code> na raiz do seu projeto para desativar deploys de Git push automaticamente de forma limpa.
                     </li>
                     <li>
-                      Vá em <strong>Settings (Configurações)</strong> &gt; <strong>Git</strong>.
+                      Acesse o painel da <strong>Vercel</strong> &gt; <strong>Settings (Configurações)</strong> &gt; <strong>Git</strong>.
                     </li>
                     <li>
-                      Role até a seção <strong>Ignored Build Step</strong> (Etapa de compilação ignorada).
+                      Role até a seção <strong>Ignored Build Step</strong> e <strong>remova</strong> qualquer comando customizado (deixe a opção vazia ou padrão).
                     </li>
                     <li>
-                      Selecione a opção <strong>Custom</strong> no dropdown e insira o seguinte comando no campo de texto:
-                      <div className="mt-1.5 flex items-center justify-between gap-2 p-2.5 rounded-lg bg-black/40 border border-white/5 font-mono text-[11px] text-amber-400/90 select-all">
-                        <code>echo "Skipping push build" && exit 0</code>
-                      </div>
-                    </li>
-                    <li>
-                      Clique em <strong>Save</strong> para salvar as alterações. Pronto! Agora a Vercel só criará deploys através do botão neste painel.
+                      Salve as alterações. Dessa forma, commits normais não gastam build, e os disparos manuais pelo painel funcionarão perfeitamente sem sumir!
                     </li>
                   </ol>
                 </div>

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Play, ArrowLeft, Lock, Download, Paperclip } from "lucide-react";
+import { Check, Play, ArrowLeft, Lock, Download, Paperclip, Clock, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -48,20 +48,31 @@ type Module = {
   position: number;
   is_premium: boolean | null;
   offer_id: string | null;
+  cover_url: string | null;
 };
+
+const premiumGradients = [
+  "from-indigo-600/30 via-violet-600/10 to-[#0c0c0e]/90 border-indigo-500/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_30px_rgba(99,102,241,0.15)]",
+  "from-rose-600/30 via-pink-600/10 to-[#0c0c0e]/90 border-rose-500/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_30px_rgba(244,63,94,0.15)]",
+  "from-emerald-600/30 via-teal-600/10 to-[#0c0c0e]/90 border-emerald-500/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_30px_rgba(16,185,129,0.15)]",
+  "from-cyan-600/30 via-blue-600/10 to-[#0c0c0e]/90 border-cyan-500/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_30px_rgba(6,182,212,0.15)]",
+  "from-amber-600/30 via-orange-600/10 to-[#0c0c0e]/90 border-amber-500/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_30px_rgba(245,158,11,0.15)]",
+  "from-fuchsia-600/30 via-purple-600/10 to-[#0c0c0e]/90 border-fuchsia-500/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_30px_rgba(217,70,239,0.15)]",
+];
 
 function CourseDetail() {
   const { courseId } = Route.useParams();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["course", courseId, user?.id],
     enabled: !!user,
     queryFn: async () => {
       const [c, m, l, p, o, prof] = await Promise.all([
-        supabase.from("courses").select("*").eq("id", courseId).single(),
+        supabase.from("courses").select("*").eq("id", courseId).eq("status", "published").single(),
         supabase.from("modules").select("*").eq("course_id", courseId).order("position"),
         supabase.from("lessons").select("*").eq("course_id", courseId).order("position"),
         supabase.from("lesson_progress").select("lesson_id").eq("user_id", user!.id),
@@ -81,12 +92,6 @@ function CourseDetail() {
       };
     },
   });
-
-  useEffect(() => {
-    if (data?.lessons.length && !activeLessonId) {
-      setActiveLessonId(data.lessons[0].id);
-    }
-  }, [data, activeLessonId]);
 
   const addXp = useAddXp();
 
@@ -110,6 +115,7 @@ function CourseDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["course", courseId] });
       qc.invalidateQueries({ queryKey: ["courses"] });
+      qc.invalidateQueries({ queryKey: ["member-progress", user?.id] });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -146,11 +152,26 @@ function CourseDetail() {
     ...(orphans.length ? [{ mod: null as Module | null, items: orphans }] : []),
   ].filter((g) => g.items.length > 0);
 
+  const firstUncompletedLesson = lessons.find((l) => !done.has(l.id)) ?? lessons[0];
+  const isStarted = completed > 0;
+
+  const currentModuleId = selectedModuleId ?? (grouped[0]?.mod?.id ?? "orphans");
+  const activeGroup = grouped.find((g) => (g.mod?.id ?? "orphans") === currentModuleId) ?? grouped[0];
+
   return (
     <div className="space-y-6 animate-fade-up">
-      <Link to="/courses" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-3.5 w-3.5" /> Voltar
-      </Link>
+      {activeLessonId ? (
+        <button
+          onClick={() => setActiveLessonId(null)}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer bg-transparent border-none outline-none"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Voltar para os módulos
+        </button>
+      ) : (
+        <Link to="/courses" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-3.5 w-3.5" /> Voltar para cursos
+        </Link>
+      )}
 
       <header className="glass-strong rounded-2xl overflow-hidden relative">
         <div className="absolute inset-0">
@@ -176,6 +197,232 @@ function CourseDetail() {
       {total === 0 ? (
         <div className="glass rounded-2xl p-8 text-sm text-muted-foreground text-center">
           Este curso ainda não possui aulas. Adicione aulas em <span className="text-foreground">Admin → Módulos & Aulas</span>.
+        </div>
+      ) : activeLessonId === null ? (
+        <div className="space-y-6">
+          {/* CTA Card */}
+          <div className="relative overflow-hidden rounded-2xl p-6 border border-primary/20 bg-gradient-to-r from-primary/10 via-purple-500/5 to-transparent backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_12px_40px_-12px_rgba(99,102,241,0.25)]">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+            <div className="relative z-10 space-y-1">
+              <span className="text-[10px] uppercase tracking-wider text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-full">Status do Progresso</span>
+              <h2 className="text-xl font-bold text-white mt-2">Navegue pelos módulos</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {isStarted ? `Você completou ${completed} de ${total} aulas. Continue de onde parou!` : "Comece a sua jornada agora mesmo!"}
+              </p>
+            </div>
+            {firstUncompletedLesson && (
+              <button
+                onClick={() => setActiveLessonId(firstUncompletedLesson.id)}
+                className="relative z-10 gradient-primary text-primary-foreground px-6 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 hover:scale-[1.02] transition active:scale-[0.98] shadow-[0_8px_24px_-8px_oklch(0.65_0.22_290/0.6)] shrink-0 cursor-pointer group"
+              >
+                <Play className="h-4 w-4 transition-transform group-hover:scale-110" fill="currentColor" />
+                {isStarted ? "Continuar de onde parou" : "Começar a Assistir"}
+              </button>
+            )}
+          </div>
+
+          {/* Módulos do Curso - Estilo Netflix */}
+          <div className="space-y-4">
+            <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1">
+              Selecione o Módulo
+            </h3>
+            <div className="flex overflow-x-auto gap-4 pt-2 pb-5 px-2 -mx-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+              {grouped.map(({ mod, items }, idx) => {
+                const isSelected = (mod?.id ?? "orphans") === currentModuleId;
+                const modLessons = items;
+                const modCompleted = modLessons.filter((l) => done.has(l.id)).length;
+                const modTotal = modLessons.length;
+                const modProgress = modTotal ? Math.round((modCompleted / modTotal) * 100) : 0;
+                
+                const gradient = premiumGradients[idx % premiumGradients.length];
+
+                return (
+                  <button
+                    key={mod?.id ?? "orphans"}
+                    onClick={() => setSelectedModuleId(mod?.id ?? "orphans")}
+                    className={`relative w-64 aspect-[14/9] shrink-0 rounded-2xl border text-left overflow-hidden transition-all duration-300 group cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 ${
+                      isSelected
+                        ? "border-primary shadow-[0_0_25px_rgba(99,102,241,0.25)] ring-1 ring-primary/50"
+                        : "border-white/5 hover:border-white/15 bg-white/[0.01]"
+                    }`}
+                  >
+                    {/* Cover image if available */}
+                    {mod?.cover_url ? (
+                      <>
+                        <img
+                          src={mod.cover_url}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        {/* Dark glassmorphic/gradient overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0c0c0e]/90 via-[#0c0c0e]/40 to-[#0c0c0e]/10 group-hover:from-[#0c0c0e]/95 transition-all" />
+                      </>
+                    ) : (
+                      /* Dynamic cover gradient overlay fallback */
+                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-90 group-hover:opacity-100 transition-opacity`} />
+                    )}
+                    
+                    {/* Nebula grid overlay */}
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none" />
+                    
+                    {/* Content */}
+                    <div className="absolute inset-0 p-4 flex flex-col justify-between z-10">
+                      <div className="flex items-start justify-between">
+                        <span className="text-[9px] uppercase tracking-wider text-white/80 font-bold bg-white/10 backdrop-blur-md px-2 py-0.5 rounded border border-white/10">
+                          {mod?.position !== undefined ? `Módulo ${String(mod.position + 1).padStart(2, "0")}` : "Extra"}
+                        </span>
+                        {mod?.is_premium && (
+                          <span className="p-1 rounded bg-amber-500/20 border border-amber-500/30 text-amber-400">
+                            <Lock className="h-3 w-3" />
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-1 mt-auto">
+                        <h4 className="font-bold text-white text-sm md:text-base leading-snug line-clamp-2 drop-shadow-md group-hover:text-primary-light transition-colors">
+                          {mod?.title ?? "Aulas sem módulo"}
+                        </h4>
+                        <p className="text-[11px] text-white/50">
+                          {modTotal} {modTotal === 1 ? "aula" : "aulas"}
+                        </p>
+                      </div>
+                      
+                      {/* Integrated progress bar at the bottom */}
+                      <div className="space-y-1 mt-2">
+                        <div className="flex justify-between items-center text-[9px] text-white/60">
+                          <span>{modCompleted}/{modTotal} concluídas</span>
+                          <span>{modProgress}%</span>
+                        </div>
+                        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full gradient-primary" style={{ width: `${modProgress}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Timeline do Módulo Ativo */}
+          {activeGroup && (
+            <div className="glass rounded-2xl p-6 border border-white/5 space-y-6 animate-fade-in">
+              {(() => {
+                const mod = activeGroup.mod;
+                const modLessons = activeGroup.items;
+                const modCompleted = modLessons.filter((l) => done.has(l.id)).length;
+                const modTotal = modLessons.length;
+                const modProgress = modTotal ? Math.round((modCompleted / modTotal) * 100) : 0;
+                
+                const radius = 18;
+                const circumference = 2 * Math.PI * radius;
+                const strokeDashoffset = circumference - (modProgress / 100) * circumference;
+
+                return (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-5">
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase tracking-wider text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-full">
+                          {mod?.position !== undefined ? `Módulo ${String(mod.position + 1).padStart(2, "0")}` : "Extra"}
+                        </span>
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2 mt-2">
+                          {mod?.title ?? "Aulas sem módulo"}
+                          {mod?.is_premium && <Lock className="h-4 w-4 text-amber-400" />}
+                        </h3>
+                        {mod?.description && <p className="text-sm text-muted-foreground mt-1">{mod.description}</p>}
+                      </div>
+                      
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs text-muted-foreground">
+                          {modCompleted}/{modTotal} concluídas
+                        </span>
+                        <div className="relative h-12 w-12 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.15)] rounded-full bg-white/[0.02] border border-white/5">
+                          <svg className="w-12 h-12 transform -rotate-90">
+                            <circle cx="24" cy="24" r={radius} className="stroke-white/5" strokeWidth="2.5" fill="transparent" />
+                            <circle
+                              cx="24"
+                              cy="24"
+                              r={radius}
+                              className="stroke-primary transition-all duration-500 drop-shadow-[0_0_4px_rgba(99,102,241,0.5)]"
+                              strokeWidth="2.5"
+                              fill="transparent"
+                              strokeDasharray={circumference}
+                              strokeDashoffset={strokeDashoffset}
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span className="absolute text-[10px] font-bold text-white">{modProgress}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Vertical Timeline pathway for Active Module's Lessons */}
+                    <div className="relative pl-6 sm:pl-8 border-l border-white/10 space-y-4 ml-3 sm:ml-5 mt-4">
+                      {modLessons.map((l, idx) => {
+                        const isDone = done.has(l.id);
+                        const lMod = modules.find((m) => m.id === l.module_id);
+                        const lLocked = accessDenied || (l.is_premium && l.offer_id) || (lMod?.is_premium && lMod?.offer_id);
+                        return (
+                          <div key={l.id} className="relative group">
+                            {/* Bullet centered exactly on the vertical border line */}
+                            <div className={`absolute -left-[38px] sm:-left-[46px] top-[12px] h-7 w-7 rounded-full flex items-center justify-center border transition-all duration-300 z-10 bg-[#0c0c0e] ${
+                              lLocked
+                                ? "border-amber-500/30 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.15)]"
+                                : isDone
+                                  ? "gradient-primary border-transparent text-primary-foreground shadow-[0_0_12px_rgba(99,102,241,0.3)]"
+                                  : "border-white/10 text-muted-foreground group-hover:border-primary/50 group-hover:text-primary group-hover:shadow-[0_0_12px_rgba(99,102,241,0.2)]"
+                            }`}>
+                              {lLocked ? (
+                                <Lock className="h-3 w-3" />
+                              ) : isDone ? (
+                                <Check className="h-3.5 w-3.5" />
+                              ) : (
+                                <Play className="h-3 w-3" fill="currentColor" />
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => setActiveLessonId(l.id)}
+                              className="w-full text-left p-4 rounded-xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-primary/20 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer group-hover:translate-x-1"
+                            >
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                                  Aula {String(idx + 1).padStart(2, "0")}
+                                </span>
+                                <h4 className="text-sm font-semibold text-white group-hover:text-primary transition-colors">
+                                  {l.title}
+                                </h4>
+                              </div>
+
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-white/[0.02] px-2.5 py-1 rounded-md border border-white/5">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  <span>{l.duration ?? l.duration_min ?? 0} min</span>
+                                </div>
+
+                                {l.is_free && (
+                                  <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 uppercase font-semibold border border-emerald-500/20">
+                                    Grátis
+                                  </span>
+                                )}
+                                {lLocked && !l.is_free && (
+                                  <span className="text-[9px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 uppercase font-semibold border border-amber-500/20">
+                                    Premium
+                                  </span>
+                                )}
+
+                                <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all hidden sm:block" />
+                              </div>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid lg:grid-cols-[1fr_320px] gap-6">
@@ -260,9 +507,10 @@ function CourseDetail() {
               </div>
 
               {activeLesson.description && (
-                <p className="text-sm text-muted-foreground mt-4 whitespace-pre-wrap">
-                  {activeLesson.description}
-                </p>
+                <div 
+                  className="text-sm text-muted-foreground mt-4 prose prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: activeLesson.description }}
+                />
               )}
               {activeLesson.content && (
                 <div className="mt-4 text-sm whitespace-pre-wrap leading-relaxed">

@@ -50,7 +50,7 @@ export function useNotes(options?: { lessonId?: string; search?: string; tag?: s
 
       let query = supabase
         .from('user_notes')
-        .select('*, lessons(title, module_id, modules(title, course_id, courses(title)))')
+        .select('*, lessons(title, module_id, modules(title, course_id, courses(title, status)))')
         .eq('user_id', user.id)
         .order('pinned', { ascending: false })
         .order('updated_at', { ascending: false });
@@ -66,21 +66,23 @@ export function useNotes(options?: { lessonId?: string; search?: string; tag?: s
       const { data, error } = await query;
       if (error) throw error;
 
-      let result = (data || []).map((note: any) => ({
-        id: note.id,
-        user_id: note.user_id,
-        lesson_id: note.lesson_id,
-        title: note.title,
-        content: note.content,
-        tags: note.tags || [],
-        color: note.color || 'default',
-        pinned: note.pinned,
-        created_at: note.created_at,
-        updated_at: note.updated_at,
-        lesson_title: note.lessons?.title || null,
-        module_title: note.lessons?.modules?.title || null,
-        course_title: note.lessons?.modules?.courses?.title || null,
-      })) as UserNote[];
+      let result = (data || [])
+        .filter((note: any) => !note.lessons?.modules?.courses || note.lessons.modules.courses.status === 'published')
+        .map((note: any) => ({
+          id: note.id,
+          user_id: note.user_id,
+          lesson_id: note.lesson_id,
+          title: note.title,
+          content: note.content,
+          tags: note.tags || [],
+          color: note.color || 'default',
+          pinned: note.pinned,
+          created_at: note.created_at,
+          updated_at: note.updated_at,
+          lesson_title: note.lessons?.title || null,
+          module_title: note.lessons?.modules?.title || null,
+          course_title: note.lessons?.modules?.courses?.title || null,
+        })) as UserNote[];
 
       // Client-side search filter
       if (options?.search) {

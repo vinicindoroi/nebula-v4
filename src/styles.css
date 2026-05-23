@@ -170,9 +170,16 @@
  * Fix: Reset border to initial (none) for all React Flow internals,
  * then re-enable border-style only on handles that need it.
  */
-.react-flow *,
-.react-flow *::before,
-.react-flow *::after {
+.react-flow__pane,
+.react-flow__viewport,
+.react-flow__nodes,
+.react-flow__node,
+.react-flow__handle,
+.react-flow__edges,
+.react-flow__edge,
+.react-flow__edge-path,
+.react-flow__connection,
+.react-flow__connection-path {
   border-style: none;
   border-width: 0;
   border-color: transparent;

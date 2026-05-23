@@ -13,7 +13,7 @@ import { Modal, Field, inputClass } from "@/components/admin/Modal";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { notifyUser } from "@/lib/notify";
 import { useSavedPosts, useToggleSave } from "@/hooks/use-saved-posts";
-import { useAddXp } from "@/hooks/use-xp";
+import { useAddXp, getLevel } from "@/hooks/use-xp";
 
 export const Route = createFileRoute("/_app/forum")({
   component: ForumPage,
@@ -75,7 +75,7 @@ function ForumPage() {
         db.from("forum_post_tags").select("post_id, tag_id"),
         db.from("forum_likes").select("post_id, user_id"),
         db.from("forum_replies").select("post_id"),
-        db.from("profiles").select("id, full_name, avatar_url"),
+        db.from("profiles").select("id, full_name, avatar_url, xp"),
       ]);
       if (pRes.error) throw pRes.error;
       const profs = new Map((profRes.data ?? []).map((p: any) => [p.id, p]));
@@ -175,10 +175,47 @@ function ForumPage() {
             <p className="text-xs text-muted-foreground mt-1">Seja o primeiro a criar um tópico.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filtered.map((p) => (
-              <ForumPostCard key={p.id} post={p} userId={user!.id} onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })} onDelete={() => { if (confirm("Apagar post?")) remove.mutate(p.id); }} onClick={() => setViewingPost(p)} />
-            ))}
+          <div className="space-y-4">
+            {/* Pinned Posts Section */}
+            {(() => {
+              const pinnedPosts = filtered.filter((p) => p.pinned);
+              const regularPosts = filtered.filter((p) => !p.pinned);
+              return (
+                <>
+                  {pinnedPosts.length > 0 && (
+                    <div className="space-y-3 p-4 rounded-3xl border border-violet-500/20 bg-gradient-to-b from-violet-500/[0.04] to-transparent shadow-[0_8px_32px_-12px_rgba(139,92,246,0.15)] relative overflow-hidden group/pinned">
+                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-500/10 via-transparent to-transparent pointer-events-none" />
+                      <div className="flex items-center gap-2 text-xs font-semibold text-violet-400 tracking-wide uppercase px-1 pb-1">
+                        <Pin className="h-3.5 w-3.5" />
+                        <span>Tópicos em Destaque</span>
+                      </div>
+                      <div className="space-y-3">
+                        {pinnedPosts.map((p) => (
+                          <ForumPostCard key={p.id} post={p} userId={user!.id} onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })} onDelete={() => { if (confirm("Apagar post?")) remove.mutate(p.id); }} onClick={() => setViewingPost(p)} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {regularPosts.length > 0 ? (
+                    <div className="space-y-3">
+                      {pinnedPosts.length > 0 && (
+                        <h3 className="text-xs font-semibold text-muted-foreground/50 uppercase tracking-wider px-1 pt-2">Discussões Recentes</h3>
+                      )}
+                      {regularPosts.map((p) => (
+                        <ForumPostCard key={p.id} post={p} userId={user!.id} onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })} onDelete={() => { if (confirm("Apagar post?")) remove.mutate(p.id); }} onClick={() => setViewingPost(p)} />
+                      ))}
+                    </div>
+                  ) : pinnedPosts.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-16 text-center">
+                      <Hash className="h-10 w-10 mx-auto text-muted-foreground/20 mb-3" />
+                      <div className="text-sm font-medium">Nenhum post encontrado</div>
+                      <p className="text-xs text-muted-foreground mt-1">Seja o primeiro a criar um tópico.</p>
+                    </div>
+                  ) : null}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -199,6 +236,62 @@ function renderHashtags(text: string) {
   return text.split(/(#\w+)/g).map((part, i) => part.startsWith("#") ? <span key={i} className="text-primary font-medium">{part}</span> : part);
 }
 
+/* ─── Level Badge & Avatar helper components ─── */
+
+function LevelBadge({ xp }: { xp: number }) {
+  const levelInfo = getLevel(xp);
+  const getRankColor = (lvl: number) => {
+    if (lvl >= 8) return "from-yellow-400/20 to-amber-500/20 text-amber-300 border-amber-500/30";
+    if (lvl >= 7) return "from-fuchsia-500/20 to-purple-600/20 text-purple-300 border-purple-500/30";
+    if (lvl >= 6) return "from-violet-500/20 to-indigo-600/20 text-indigo-300 border-indigo-500/30";
+    if (lvl >= 5) return "from-blue-500/20 to-cyan-500/20 text-blue-300 border-blue-500/30";
+    if (lvl >= 4) return "from-teal-500/20 to-emerald-500/20 text-emerald-300 border-teal-500/30";
+    if (lvl >= 3) return "from-emerald-500/20 to-green-500/20 text-green-300 border-emerald-500/30";
+    if (lvl >= 2) return "from-orange-500/20 to-red-500/20 text-orange-300 border-orange-500/30";
+    return "from-slate-500/10 to-slate-600/10 text-slate-400 border-slate-500/20";
+  };
+
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full border text-[9px] font-semibold bg-gradient-to-r ${getRankColor(levelInfo.level)}`}>
+      Lv. {levelInfo.level} • {levelInfo.title}
+    </span>
+  );
+}
+
+function Avatar({ initials, size = "md", xp = 0, avatarUrl, name }: { initials: string; size?: "sm" | "md"; xp?: number; avatarUrl?: string | null; name?: string }) {
+  const levelInfo = getLevel(xp);
+  const cls = size === "sm" ? "h-8 w-8 text-[10px]" : "h-10 w-10 text-xs";
+
+  const getRingColor = (lvl: number) => {
+    if (lvl >= 8) return "ring-amber-500/40 shadow-[0_0_8px_rgba(245,158,11,0.3)]";
+    if (lvl >= 7) return "ring-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)]";
+    if (lvl >= 6) return "ring-indigo-500/40 shadow-[0_0_8px_rgba(99,102,241,0.3)]";
+    if (lvl >= 5) return "ring-blue-500/30 shadow-[0_0_6px_rgba(59,130,246,0.25)]";
+    if (lvl >= 4) return "ring-teal-500/30";
+    if (lvl >= 3) return "ring-emerald-500/30";
+    if (lvl >= 2) return "ring-orange-500/30";
+    return "ring-white/10";
+  };
+
+  const ringCls = getRingColor(levelInfo.level);
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name || ""}
+        className={`${cls} rounded-full object-cover shrink-0 ring-2 ${ringCls}`}
+      />
+    );
+  }
+
+  return (
+    <div className={`${cls} rounded-full gradient-primary flex items-center justify-center font-semibold text-primary-foreground shrink-0 ring-2 ${ringCls}`}>
+      {initials}
+    </div>
+  );
+}
+
 /* ─── Post Card ─── */
 function ForumPostCard({ post, userId, onLike, onDelete, onClick }: { post: ForumPost; userId: string; onLike: () => void; onDelete: () => void; onClick: () => void }) {
   const name = post.author?.full_name || "Membro";
@@ -206,21 +299,28 @@ function ForumPostCard({ post, userId, onLike, onDelete, onClick }: { post: Foru
   const mine = post.user_id === userId;
   const isLong = post.content.length > 300;
   const [expanded, setExpanded] = useState(false);
+  const postXp = (post.author as any)?.xp ?? 0;
 
   return (
-    <article onClick={onClick} className={`rounded-2xl border overflow-hidden transition-all group cursor-pointer ${post.pinned ? "border-primary/20 bg-primary/[0.02]" : "border-white/[0.08] bg-white/[0.02]"} hover:border-white/[0.12]`}>
+    <article
+      onClick={onClick}
+      className={`rounded-2xl border overflow-hidden transition-all duration-300 group cursor-pointer relative ${
+        post.is_service
+          ? "border-pink-500/30 bg-gradient-to-br from-pink-950/[0.05] via-white/[0.01] to-white/[0.02] hover:border-pink-500/50 hover:shadow-[0_0_24px_rgba(244,63,94,0.1)]"
+          : post.pinned
+          ? "border-violet-500/20 bg-violet-500/[0.01] hover:border-violet-500/35 hover:shadow-[0_0_24px_rgba(139,92,246,0.08)]"
+          : "border-white/[0.08] bg-white/[0.015] hover:bg-white/[0.02] hover:border-white/[0.12] hover:shadow-[0_8px_32px_-12px_rgba(0,0,0,0.5)]"
+      }`}
+    >
       <div className="p-5">
         <div className="flex items-center gap-3 mb-3">
-          {post.author?.avatar_url ? (
-            <img src={post.author.avatar_url} alt={name} className="h-9 w-9 rounded-full object-cover ring-2 ring-white/10" />
-          ) : (
-            <div className="h-9 w-9 rounded-full gradient-primary flex items-center justify-center text-[10px] font-semibold text-primary-foreground ring-2 ring-primary/20">{initials}</div>
-          )}
+          <Avatar initials={initials} size="sm" xp={postXp} avatarUrl={post.author?.avatar_url} name={name} />
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold truncate">{name}</span>
-              {post.pinned && <Pin className="h-3 w-3 text-primary" />}
-              {post.is_service && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20 font-medium">Serviço</span>}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold truncate text-foreground/90">{name}</span>
+              <LevelBadge xp={postXp} />
+              {post.pinned && <Pin className="h-3 w-3 text-violet-400" />}
+              {post.is_service && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20 font-semibold shadow-[0_2px_8px_rgba(244,63,94,0.15)]">Serviço</span>}
             </div>
             <div className="text-[11px] text-muted-foreground/60">{formatTime(post.created_at)}</div>
           </div>
@@ -234,8 +334,8 @@ function ForumPostCard({ post, userId, onLike, onDelete, onClick }: { post: Foru
         <div className={`text-sm text-muted-foreground/90 leading-relaxed break-words prose prose-invert prose-sm max-w-none ${!expanded && isLong ? "line-clamp-4" : ""}`} dangerouslySetInnerHTML={{ __html: post.content }} />
         {isLong && <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} className="text-xs text-primary mt-1 hover:underline">{expanded ? "Ver menos" : "Ver mais"}</button>}
         {post.is_service && post.service_price && (
-          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-medium">
-            <Briefcase className="h-3.5 w-3.5" /> {post.service_price}
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-semibold shadow-[0_2px_10px_rgba(244,63,94,0.1)]">
+            <Briefcase className="h-3.5 w-3.5" /> <span>{post.service_price}</span>
           </div>
         )}
         {post.tags.length > 0 && (
@@ -251,12 +351,31 @@ function ForumPostCard({ post, userId, onLike, onDelete, onClick }: { post: Foru
       {post.image_url && (
         <div className="border-t border-white/[0.06]"><img src={post.image_url} alt="" className="w-full max-h-[360px] object-cover" loading="lazy" /></div>
       )}
-      <div className="px-5 py-3 border-t border-white/[0.06] flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onLike} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition border ${post.liked ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-transparent"}`}>
-          <Heart className="h-3.5 w-3.5" fill={post.liked ? "currentColor" : "none"} /> {post.likes || ""}
+      <div className="px-5 py-3 border-t border-white/[0.06] flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        {/* Curtir */}
+        <button
+          onClick={onLike}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
+            post.liked
+              ? "text-rose-400 bg-rose-500/10 border border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+              : "text-muted-foreground hover:text-foreground hover:bg-white/5 border border-white/[0.06] bg-white/[0.01]"
+          }`}
+        >
+          <Heart className={`h-3.5 w-3.5 transition-transform duration-200 ${post.liked ? "scale-110" : ""}`} fill={post.liked ? "currentColor" : "none"} />
+          <span className="tabular-nums">{post.likes || 0}</span>
         </button>
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground"><MessageCircle className="h-3.5 w-3.5" /> {post.replies || ""}</div>
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground/50 ml-auto"><Eye className="h-3.5 w-3.5" /> {post.views}</div>
+
+        {/* Respostas */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground border border-white/[0.06] bg-white/[0.01]">
+          <MessageCircle className="h-3.5 w-3.5" />
+          <span className="tabular-nums">{post.replies || 0}</span>
+        </div>
+
+        {/* Visualizações */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground/50 border border-white/[0.04] bg-white/[0.005] ml-auto">
+          <Eye className="h-3.5 w-3.5" />
+          <span className="tabular-nums">{post.views || 0}</span>
+        </div>
       </div>
     </article>
   );
@@ -274,13 +393,14 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
   const [editTitle, setEditTitle] = useState(post.title);
   const [editContent, setEditContent] = useState(post.content);
   const mine = post.user_id === userId;
+  const postXp = (post.author as any)?.xp ?? 0;
 
   const { data: replies = [], isLoading } = useQuery({
     queryKey: ["forum-replies", post.id],
     queryFn: async (): Promise<Reply[]> => {
       const [rRes, profRes] = await Promise.all([
         db.from("forum_replies").select("*").eq("post_id", post.id).order("created_at"),
-        db.from("profiles").select("id, full_name, avatar_url"),
+        db.from("profiles").select("id, full_name, avatar_url, xp"),
       ]);
       const profs = new Map((profRes.data ?? []).map((p: any) => [p.id, p]));
       return (rRes.data ?? []).map((r: any) => ({ ...r, author: profs.get(r.user_id) ?? null }));
@@ -344,9 +464,12 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
 
         <div className="p-6 md:p-8 space-y-5">
           <div className="flex items-center gap-3">
-            {post.author?.avatar_url ? <img src={post.author.avatar_url} alt={authorName} className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10" /> : <div className="h-10 w-10 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-primary-foreground ring-2 ring-primary/20">{authorInitials}</div>}
+            <Avatar initials={authorInitials} size="md" xp={postXp} avatarUrl={post.author?.avatar_url} name={authorName} />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold">{authorName}</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-foreground/90">{authorName}</span>
+                <LevelBadge xp={postXp} />
+              </div>
               <div className="text-[11px] text-muted-foreground/50">{formatTime(post.created_at)}</div>
             </div>
             {mine && !editing && <button onClick={() => setEditing(true)} className="text-[11px] px-3 py-1.5 rounded-xl border border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 transition font-medium">Editar</button>}
@@ -368,13 +491,33 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
             </>
           )}
 
-          {post.is_service && post.service_price && <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-medium"><Briefcase className="h-3.5 w-3.5" /> {post.service_price}</div>}
+          {post.is_service && post.service_price && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-semibold shadow-[0_2px_10px_rgba(244,63,94,0.1)]">
+              <Briefcase className="h-3.5 w-3.5" /> <span>{post.service_price}</span>
+            </div>
+          )}
           {post.tags.length > 0 && <div className="flex gap-1.5 flex-wrap">{post.tags.map((t) => <span key={t.id} className="text-[10px] px-2.5 py-1 rounded-full border border-white/10 text-muted-foreground flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: t.color }} /> {t.name}</span>)}</div>}
 
-          <div className="flex items-center gap-3 pt-3 border-t border-white/[0.06]">
-            <button onClick={onLike} className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition border ${post.liked ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-white/10"}`}><Heart className="h-4 w-4" fill={post.liked ? "currentColor" : "none"} /> {post.likes}</button>
-            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground"><MessageCircle className="h-4 w-4" /> {replies.length}</span>
-            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground/40 ml-auto"><Eye className="h-4 w-4" /> {post.views}</span>
+          <div className="flex items-center gap-2 pt-3 border-t border-white/[0.06]">
+            <button
+              onClick={onLike}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 hover:scale-105 active:scale-95 ${
+                post.liked
+                  ? "text-rose-400 bg-rose-500/10 border border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5 border border-white/10"
+              }`}
+            >
+              <Heart className={`h-4 w-4 transition-transform duration-200 ${post.liked ? "scale-110" : ""}`} fill={post.liked ? "currentColor" : "none"} />
+              <span className="tabular-nums">{post.likes || 0}</span>
+            </button>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground border border-white/10 bg-white/[0.02]">
+              <MessageCircle className="h-4 w-4" />
+              <span className="tabular-nums">{replies.length || 0}</span>
+            </div>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground/40 border border-white/[0.06] bg-white/[0.005] ml-auto">
+              <Eye className="h-4 w-4" />
+              <span className="tabular-nums">{post.views || 0}</span>
+            </div>
           </div>
 
           <div className="pt-4 border-t border-white/[0.06]">
@@ -384,12 +527,14 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
                 {replies.map((r) => {
                   const rName = r.author?.full_name || "Membro";
                   const rInit = rName.slice(0, 2).toUpperCase();
+                  const rXp = (r.author as any)?.xp ?? 0;
                   return (
                     <div key={r.id} className="flex gap-3 group/r">
-                      {r.author?.avatar_url ? <img src={r.author.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" /> : <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-medium text-muted-foreground shrink-0">{rInit}</div>}
+                      <Avatar initials={rInit} size="sm" xp={rXp} avatarUrl={r.author?.avatar_url} name={rName} />
                       <div className="flex-1 min-w-0 rounded-2xl bg-white/[0.03] border border-white/[0.05] px-4 py-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold">{rName}</span>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="text-xs font-semibold text-foreground/90">{rName}</span>
+                          <LevelBadge xp={rXp} />
                           <span className="text-[10px] text-muted-foreground/40">{formatTime(r.created_at)}</span>
                           {r.user_id === userId && <button onClick={() => deleteReply.mutate(r.id)} className="opacity-0 group-hover/r:opacity-100 ml-auto text-muted-foreground hover:text-red-400 transition"><Trash2 className="h-3 w-3" /></button>}
                         </div>

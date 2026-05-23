@@ -81,11 +81,7 @@ function FunnelsPage() {
     setSelectedFunnel(result as unknown as Funnel);
   };
 
-  const selectedFunnelIdRef = useRef<string | null>(null);
-  selectedFunnelIdRef.current = selectedFunnel?.id ?? null;
-
-  const handleSaveFunnel = useCallback((nodes: Node[], edges: Edge[], viewport: Viewport) => {
-    const funnelId = selectedFunnelIdRef.current;
+  const handleSaveFunnel = useCallback((funnelId: string, nodes: Node[], edges: Edge[], viewport: Viewport) => {
     if (!funnelId) return;
     silentSaveInFlightRef.current = true;
 

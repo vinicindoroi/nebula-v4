@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useChildMatches } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Play, Search, Filter, BookOpen, CheckCircle2, Clock, Sparkles } from "lucide-react";
+import { Play, Search, Filter, BookOpen, CheckCircle2, Clock } from "lucide-react";
 import { useCourses } from "@/hooks/use-courses";
 
 export const Route = createFileRoute("/_app/courses")({
@@ -18,7 +18,7 @@ const QUICK_FILTERS = [
   { id: "all", label: "Todos", icon: BookOpen },
   { id: "progress", label: "Em andamento", icon: Clock },
   { id: "done", label: "Concluídos", icon: CheckCircle2 },
-  { id: "new", label: "Não iniciados", icon: Sparkles },
+  { id: "new", label: "Não iniciados", icon: Play },
 ] as const;
 
 function CoursesList() {
