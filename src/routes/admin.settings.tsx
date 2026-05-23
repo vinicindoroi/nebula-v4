@@ -325,26 +325,23 @@ function Page() {
                 <div className="border border-amber-500/10 bg-amber-500/[0.02] rounded-2xl p-5 space-y-3">
                   <div className="flex items-center gap-2.5 text-amber-500">
                     <AlertCircle className="h-4 w-4" />
-                    <h4 className="text-sm font-medium">Como evitar que deploys sumam ou sejam cancelados?</h4>
+                    <h4 className="text-sm font-medium">Como evitar 404 e gerenciar deploys corretamente?</h4>
                   </div>
                   <p className="text-xs leading-relaxed text-muted-foreground">
-                    Se você adicionou anteriormente o comando <code>echo "Skipping push build" && exit 0</code> na seção <strong>Ignored Build Step</strong> do painel da Vercel, todos os deploys (incluindo os disparados pelo botão) serão cancelados e sumirão do painel!
+                    Como este projeto usa o compilador do <strong>TanStack Start</strong>, ter um arquivo <code>vercel.json</code> ou usar comandos no <strong>Ignored Build Step</strong> da Vercel gera conflitos e causa erros de <strong>404 Not Found</strong> ou cancelamentos indesejados!
                   </p>
                   <p className="text-xs font-medium leading-relaxed text-amber-500/90">
-                    Para desativar deploys automáticos de commits do Git e permitir que apenas o botão acima funcione:
+                    Para desativar deploys automáticos do Git push de forma limpa e segura:
                   </p>
                   <ol className="text-xs space-y-2 text-muted-foreground list-decimal pl-4">
                     <li>
-                      Já adicionamos o arquivo <code>vercel.json</code> na raiz do seu projeto para desativar deploys de Git push automaticamente de forma limpa.
+                      Acesse a <strong>Vercel</strong> &gt; <strong>Settings</strong> &gt; <strong>Git</strong>, vá em <strong>Ignored Build Step</strong> e <strong>remova</strong> qualquer comando customizado (limpe o campo).
                     </li>
                     <li>
-                      Acesse o painel da <strong>Vercel</strong> &gt; <strong>Settings (Configurações)</strong> &gt; <strong>Git</strong>.
+                      Para enviar novos commits sem disparar deploys automáticos, basta incluir a tag <code>[skip ci]</code> ou <code>[skip deploy]</code> no final da mensagem do seu commit (ex: <code>git commit -m "meu commit [skip ci]"</code>).
                     </li>
                     <li>
-                      Role até a seção <strong>Ignored Build Step</strong> e <strong>remova</strong> qualquer comando customizado (deixe a opção vazia ou padrão).
-                    </li>
-                    <li>
-                      Salve as alterações. Dessa forma, commits normais não gastam build, e os disparos manuais pelo painel funcionarão perfeitamente sem sumir!
+                      Quando quiser atualizar o site, basta clicar no botão <strong>"Disparar Deploy de Produção"</strong> acima para gerar a build mais recente sem bloqueios!
                     </li>
                   </ol>
                 </div>

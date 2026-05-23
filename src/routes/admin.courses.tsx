@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Plus, Edit3, Trash2, BookOpen, X, ImageIcon, Tag as TagIcon, DollarSign, FileText, Folder, Eye, Palette, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/admin/courses")({ component: Page });
 
@@ -12,6 +13,7 @@ type Cat = { id: string; name: string };
 type Offer = { id: string; name: string };
 
 function Page() {
+  const queryClient = useQueryClient();
   const [rows, setRows] = useState<Course[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -31,7 +33,9 @@ function Page() {
     if (!confirm("Excluir este curso?")) return;
     const { error } = await supabase.from("courses").delete().eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("Curso excluído"); load();
+    toast.success("Curso excluído");
+    queryClient.invalidateQueries({ queryKey: ["courses"] });
+    load();
   };
 
   return (
@@ -81,7 +85,7 @@ function Page() {
         {rows.length === 0 && <div className="glass rounded-2xl p-12 text-center text-sm text-muted-foreground col-span-full">Nenhum curso. Clique em "Novo curso".</div>}
       </div>
 
-      {editing && <CourseModal initial={editing} cats={cats} offers={offers} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <CourseModal initial={editing} cats={cats} offers={offers} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); queryClient.invalidateQueries({ queryKey: ["courses"] }); load(); }} />}
     </div>
   );
 }
