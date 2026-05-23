@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Settings as SettingsIcon, CreditCard, Mail, Plug, ShieldCheck, Save, Type, Palette, Link as LinkIcon, Key, Hash, CloudLightning, Play, AlertCircle } from "lucide-react";
 import { Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 export const Route = createFileRoute("/admin/settings")({ component: Page });
 
@@ -52,12 +53,12 @@ function loadSettings(): SettingsShape {
 }
 
 const deployServerFn = createServerFn({ method: "POST" })
-  .validator((url: unknown) => {
-    if (typeof url !== "string" || !url.startsWith("https://api.vercel.com/")) {
-      throw new Error("URL do Deploy Hook inválida");
-    }
-    return url;
-  })
+  .inputValidator(
+    z.string().refine(
+      (url) => url.startsWith("https://api.vercel.com/"),
+      { message: "URL do Deploy Hook inválida" }
+    )
+  )
   .handler(async ({ data: url }) => {
     const res = await fetch(url, { method: "POST" });
     if (!res.ok) {
