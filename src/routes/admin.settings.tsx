@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Settings as SettingsIcon, CreditCard, Mail, Plug, ShieldCheck, Save, Type, Palette, Link as LinkIcon, Key, Hash, CloudLightning, Play, AlertCircle } from "lucide-react";
 import { Field, inputClass, selectClass, selectStyle } from "@/components/admin/Modal";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/settings")({ component: Page });
 
@@ -35,40 +36,124 @@ const TABS = [
   { id: "vercel", label: "Vercel Deploy", icon: CloudLightning },
 ] as const;
 
-function loadSettings(): SettingsShape {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULTS;
-    const parsed = JSON.parse(raw);
-    return {
-      ...DEFAULTS,
-      ...parsed,
-      vercel: parsed.vercel || DEFAULTS.vercel,
-    };
-  } catch {
-    return DEFAULTS;
-  }
-}
-
-
-
 function Page() {
   const [tab, setTab] = useState<typeof TABS[number]["id"]>("general");
   const [s, setS] = useState<SettingsShape>(DEFAULTS);
   const [dirty, setDirty] = useState(false);
   const [deploying, setDeploying] = useState(false);
 
-  useEffect(() => { setS(loadSettings()); }, []);
+  useEffect(() => {
+    const fetchSettings = async () => {
+      // First try to load cached local values
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setS({
+            ...DEFAULTS,
+            ...parsed,
+            vercel: parsed.vercel || DEFAULTS.vercel,
+          });
+        }
+      } catch (_) {}
+
+      // Then load from Supabase
+      try {
+        const [globalRes, privateRes] = await Promise.all([
+          supabase.from("global_settings").select("*").eq("id", "current").maybeSingle(),
+          supabase.from("private_settings").select("*").eq("id", "current").maybeSingle()
+        ]);
+
+        if (globalRes.error) throw globalRes.error;
+        if (privateRes.error) throw privateRes.error;
+
+        const merged: SettingsShape = { ...DEFAULTS };
+
+        if (globalRes.data) {
+          merged.general = {
+            name: globalRes.data.name,
+            logoUrl: globalRes.data.logo_url,
+            primaryColor: globalRes.data.primary_color
+          };
+        }
+
+        if (privateRes.data) {
+          merged.payments = {
+            gateway: privateRes.data.gateway,
+            publicKey: privateRes.data.public_key
+          };
+          merged.email = {
+            smtpHost: privateRes.data.smtp_host,
+            sender: privateRes.data.sender
+          };
+          merged.integrations = {
+            apiKey: privateRes.data.api_key,
+            webhookUrl: privateRes.data.webhook_url
+          };
+          merged.security = {
+            minPasswordLen: privateRes.data.min_password_len,
+            require2faAdmins: privateRes.data.require_2fa_admins
+          };
+          merged.vercel = {
+            deployHookUrl: privateRes.data.deploy_hook_url
+          };
+        }
+
+        setS(merged);
+        // Sync to cache
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      } catch (err) {
+        console.error("Error loading settings from Supabase:", err);
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   const update = <K extends keyof SettingsShape>(key: K, patch: Partial<SettingsShape[K]>) => {
     setS((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
     setDirty(true);
   };
 
-  const save = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-    setDirty(false);
-    toast.success("Configurações salvas");
+  const save = async () => {
+    try {
+      // 1. Save global public settings
+      const { error: globalErr } = await supabase.from("global_settings").upsert({
+        id: "current",
+        name: s.general.name,
+        logo_url: s.general.logoUrl,
+        primary_color: s.general.primaryColor
+      });
+      if (globalErr) throw globalErr;
+
+      // 2. Save private/admin integration settings
+      const { error: privateErr } = await supabase.from("private_settings").upsert({
+        id: "current",
+        gateway: s.payments.gateway,
+        public_key: s.payments.publicKey,
+        smtp_host: s.email.smtpHost,
+        sender: s.email.sender,
+        api_key: s.integrations.apiKey,
+        webhook_url: s.integrations.webhookUrl,
+        min_password_len: s.security.minPasswordLen,
+        require_2fa_admins: s.security.require2faAdmins,
+        deploy_hook_url: s.vercel.deployHookUrl
+      });
+      if (privateErr) throw privateErr;
+
+      // 3. Cache in localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+      
+      setDirty(false);
+      toast.success("Configurações salvas e sincronizadas com o Supabase!");
+    } catch (err: any) {
+      console.error("Error saving settings to Supabase:", err);
+      toast.error("Erro ao salvar no Supabase. Salvando localmente...");
+      
+      // Fallback
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+      setDirty(false);
+    }
   };
 
   const triggerDeploy = async () => {

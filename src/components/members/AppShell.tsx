@@ -11,6 +11,7 @@ import { usePresence } from "@/hooks/use-presence";
 import { NotificationBell } from "@/components/members/NotificationBell";
 import { TutorialWizard } from "@/components/tutorial/TutorialWizard";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 type NavGroup = { label: string; items: NavItem[] };
@@ -91,15 +92,60 @@ export function AppShell() {
   const initials = name.slice(0, 2).toUpperCase();
   const current = allNav.find((n) => path === n.to || path.startsWith(n.to + "/"))?.label ?? "Membros";
 
-  const siteSettings = useMemo(() => {
+  const [siteSettings, setSiteSettings] = useState({ name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6" });
+
+  useEffect(() => {
+    // Try to load from localStorage first for instant initial render
     try {
       const raw = localStorage.getItem("admin_settings_v1");
-      if (!raw) return { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6" };
-      const parsed = JSON.parse(raw);
-      return { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6", ...parsed.general };
-    } catch {
-      return { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6" };
-    }
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.general) {
+          setSiteSettings({
+            name: parsed.general.name || "Membros",
+            logoUrl: parsed.general.logoUrl || "/nebula_logo.png",
+            primaryColor: parsed.general.primaryColor || "#8b5cf6"
+          });
+        }
+      }
+    } catch (_) {}
+
+    // Then fetch the official settings in real-time from Supabase
+    const fetchGlobalSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("global_settings")
+          .select("name, logo_url, primary_color")
+          .eq("id", "current")
+          .maybeSingle();
+
+        if (error) throw error;
+        if (data) {
+          const fetched = {
+            name: data.name,
+            logoUrl: data.logo_url,
+            primaryColor: data.primary_color
+          };
+          setSiteSettings(fetched);
+          
+          // Sync back to localstorage as cache for next instant load
+          const raw = localStorage.getItem("admin_settings_v1") || "{}";
+          try {
+            const parsed = JSON.parse(raw);
+            parsed.general = {
+              name: data.name,
+              logoUrl: data.logo_url,
+              primaryColor: data.primary_color
+            };
+            localStorage.setItem("admin_settings_v1", JSON.stringify(parsed));
+          } catch (_) {}
+        }
+      } catch (err) {
+        console.error("Error fetching global settings from Supabase:", err);
+      }
+    };
+
+    fetchGlobalSettings();
   }, []);
 
   const onSignOut = async () => {

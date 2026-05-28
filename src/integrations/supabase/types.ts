@@ -224,6 +224,102 @@ export type Database = {
         }
         Relationships: []
       }
+      global_settings: {
+        Row: {
+          id: string
+          name: string
+          logo_url: string
+          primary_color: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name?: string
+          logo_url?: string
+          primary_color?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          logo_url?: string
+          primary_color?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      private_settings: {
+        Row: {
+          id: string
+          gateway: string
+          public_key: string
+          smtp_host: string
+          sender: string
+          api_key: string
+          webhook_url: string
+          min_password_len: number
+          require_2fa_admins: boolean
+          deploy_hook_url: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          gateway?: string
+          public_key?: string
+          smtp_host?: string
+          sender?: string
+          api_key?: string
+          webhook_url?: string
+          min_password_len?: number
+          require_2fa_admins?: boolean
+          deploy_hook_url?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          gateway?: string
+          public_key?: string
+          smtp_host?: string
+          sender?: string
+          api_key?: string
+          webhook_url?: string
+          min_password_len?: number
+          require_2fa_admins?: boolean
+          deploy_hook_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      community_stories: {
+        Row: {
+          id: string
+          user_id: string
+          user_name: string
+          user_avatar: string
+          gradient: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          user_name: string
+          user_avatar: string
+          gradient: string
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          user_name?: string
+          user_avatar?: string
+          gradient?: string
+          content?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           color: string | null

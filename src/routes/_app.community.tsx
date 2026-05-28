@@ -46,6 +46,18 @@ type Post = {
 const MAX = 2000;
 const db = supabase as any;
 
+const formatRelativeTime = (dateStr: string) => {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return "agora mesmo";
+  if (diffMins < 60) return `há ${diffMins} min`;
+  if (diffHours < 24) return `há ${diffHours} hora${diffHours > 1 ? "s" : ""}`;
+  return `há ${diffDays} dia${diffDays > 1 ? "s" : ""}`;
+};
+
 function CommunityPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -70,51 +82,82 @@ function CommunityPage() {
     viewed?: boolean;
   };
 
-  const [stories, setStories] = useState<Story[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nebula_community_stories");
-      if (saved) {
+  const [stories, setStories] = useState<Story[]>([]);
+
+  useEffect(() => {
+    const fetchStories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("community_stories")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        // Fetch viewed stories from localStorage
+        let viewedIds: string[] = [];
         try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          const rawViewed = localStorage.getItem("nebula_viewed_story_ids");
+          if (rawViewed) viewedIds = JSON.parse(rawViewed) as string[];
         } catch (_) {}
+
+        const DEFAULT_STORIES: Story[] = [
+          {
+            id: "st-1",
+            userName: "Thiago Mentor",
+            userAvatar: "TM",
+            gradient: "from-purple-600 via-pink-600 to-amber-500",
+            content: "Bati R$ 15k de faturamento hoje no dropshipping com o novo funil de conversão rápida! O ROAS disparou para 5.4x! 📈🚀",
+            date: "há 2 horas",
+            viewed: viewedIds.includes("st-1")
+          },
+          {
+            id: "st-2",
+            userName: "Carol Estrategista",
+            userAvatar: "CE",
+            gradient: "from-blue-600 to-violet-600",
+            content: "Dica de ouro para anúncios de tráfego: comecem com criativos focados na dor principal do cliente nos primeiros 3 segundos! A CTR média subiu para 3.8% nos testes. 🎯",
+            date: "há 5 horas",
+            viewed: viewedIds.includes("st-2")
+          },
+          {
+            id: "st-3",
+            userName: "Felipe Designer",
+            userAvatar: "FD",
+            gradient: "from-cyan-500 to-emerald-500",
+            content: "Nova identidade visual da área premium aprovada! A experiência gamificada vai contar com conquistas ainda mais imersivas. 🔥",
+            date: "há 8 horas",
+            viewed: viewedIds.includes("st-3")
+          },
+          {
+            id: "st-4",
+            userName: "Marina Copy",
+            userAvatar: "MC",
+            gradient: "from-orange-500 to-rose-500",
+            content: "Headline matadora validada na página de vendas do infoproduto. A taxa de conversão no checkout pulou de 1.2% para 2.45%! 📝💡",
+            date: "há 10 horas",
+            viewed: viewedIds.includes("st-4")
+          }
+        ];
+
+        const mappedDbStories = (data || []).map((s) => ({
+          id: s.id,
+          userName: s.user_name,
+          userAvatar: s.user_avatar,
+          gradient: s.gradient,
+          content: s.content,
+          date: formatRelativeTime(s.created_at),
+          viewed: viewedIds.includes(s.id)
+        }));
+
+        setStories([...mappedDbStories, ...DEFAULT_STORIES]);
+      } catch (err) {
+        console.error("Error fetching community stories:", err);
       }
-    }
-    return [
-      {
-        id: "st-1",
-        userName: "Thiago Mentor",
-        userAvatar: "TM",
-        gradient: "from-purple-600 via-pink-600 to-amber-500",
-        content: "Bati R$ 15k de faturamento hoje no dropshipping com o novo funil de conversão rápida! O ROAS disparou para 5.4x! 📈🚀",
-        date: "há 2 horas"
-      },
-      {
-        id: "st-2",
-        userName: "Carol Estrategista",
-        userAvatar: "CE",
-        gradient: "from-blue-600 to-violet-600",
-        content: "Dica de ouro para anúncios de tráfego: comecem com criativos focados na dor principal do cliente nos primeiros 3 segundos! A CTR média subiu para 3.8% nos testes. 🎯",
-        date: "há 5 horas"
-      },
-      {
-        id: "st-3",
-        userName: "Felipe Designer",
-        userAvatar: "FD",
-        gradient: "from-cyan-500 to-emerald-500",
-        content: "Nova identidade visual da área premium aprovada! A experiência gamificada vai contar com conquistas ainda mais imersivas. 🔥",
-        date: "há 8 horas"
-      },
-      {
-        id: "st-4",
-        userName: "Marina Copy",
-        userAvatar: "MC",
-        gradient: "from-orange-500 to-rose-500",
-        content: "Headline matadora validada na página de vendas do infoproduto. A taxa de conversão no checkout pulou de 1.2% para 2.45%! 📝💡",
-        date: "há 10 horas"
-      }
-    ];
-  });
+    };
+
+    fetchStories();
+  }, []);
 
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [storyProgress, setStoryProgress] = useState(0);
@@ -145,26 +188,55 @@ function CommunityPage() {
     return () => clearInterval(interval);
   }, [activeStoryIndex, stories.length]);
 
-  const handleCreateStory = (e: React.FormEvent) => {
+  const handleCreateStory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStoryText.trim()) return;
+    if (!newStoryText.trim() || !user) return;
 
-    const newStory: Story = {
-      id: "st-" + Date.now(),
-      userName: myProfile?.full_name || "Membro Star",
-      userAvatar: (myProfile?.full_name || "MS").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2),
-      gradient: newStoryGrad,
-      content: newStoryText.trim(),
-      date: "agora mesmo"
-    };
+    const uName = myProfile?.full_name || "Membro Star";
+    const uAvatar = (myProfile?.full_name || "MS")
+      .split(" ")
+      .map((n: string) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
 
-    const updated = [newStory, ...stories];
-    setStories(updated);
-    localStorage.setItem("nebula_community_stories", JSON.stringify(updated));
-    setNewStoryText("");
-    setIsCreatingStory(false);
-    toast.success("Story operacional publicado!");
-    (window as any).sendNebulaNotification?.("Novo Story Publicado! 📱", "Seu story operacional já está disponível no topo do feed da comunidade.");
+    try {
+      const { data, error } = await supabase
+        .from("community_stories")
+        .insert({
+          user_id: user.id,
+          user_name: uName,
+          user_avatar: uAvatar,
+          gradient: newStoryGrad,
+          content: newStoryText.trim()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const newStory: Story = {
+          id: data.id,
+          userName: data.user_name,
+          userAvatar: data.user_avatar,
+          gradient: data.gradient,
+          content: data.content,
+          date: "agora mesmo",
+          viewed: false
+        };
+
+        setStories((prev) => [newStory, ...prev]);
+        toast.success("Story operacional publicado!");
+        (window as any).sendNebulaNotification?.("Novo Story Publicado! 📱", "Seu story operacional já está disponível no topo do feed da comunidade.");
+      }
+    } catch (err) {
+      console.error("Error creating community story:", err);
+      toast.error("Ocorreu um erro ao publicar o story.");
+    } finally {
+      setNewStoryText("");
+      setIsCreatingStory(false);
+    }
   };
 
   const { data: savedPosts = [] } = useSavedPosts();
@@ -492,9 +564,19 @@ function CommunityPage() {
                   onClick={() => {
                     setActiveStoryIndex(idx);
                     setStoryProgress(0);
+                    const clickedStory = stories[idx];
                     const updated = stories.map((s, i) => i === idx ? { ...s, viewed: true } : s);
                     setStories(updated);
-                    localStorage.setItem("nebula_community_stories", JSON.stringify(updated));
+                    
+                    // Track viewed story IDs in localStorage
+                    try {
+                      const rawViewed = localStorage.getItem("nebula_viewed_story_ids") || "[]";
+                      const viewedIds = JSON.parse(rawViewed) as string[];
+                      if (!viewedIds.includes(clickedStory.id)) {
+                        viewedIds.push(clickedStory.id);
+                        localStorage.setItem("nebula_viewed_story_ids", JSON.stringify(viewedIds));
+                      }
+                    } catch (_) {}
                   }}
                   className={`h-14 w-14 rounded-full p-[2.5px] bg-gradient-to-tr transition-all duration-300 hover:scale-105 cursor-pointer active:scale-95 ${
                     st.viewed 
