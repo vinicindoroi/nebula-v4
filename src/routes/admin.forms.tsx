@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ScrollText, Search, RefreshCw, Trash2, Mail, Phone, Calendar, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/admin/Modal";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/forms")({
   component: AdminFormsPage,
@@ -53,47 +54,133 @@ function AdminFormsPage() {
   // Modal selection state
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
 
-  const loadSubmissions = () => {
+  const loadSubmissions = async () => {
     setLoading(true);
-    let data = localStorage.getItem("nebula_form_submissions");
-    
-    // If no submissions exist, pre-populate with mock data
-    if (!data) {
-      localStorage.setItem("nebula_form_submissions", JSON.stringify(DEFAULT_SUBMISSIONS));
-      data = JSON.stringify(DEFAULT_SUBMISSIONS);
-    }
-    
     try {
-      const parsed = JSON.parse(data) as Submission[];
-      setSubmissions(parsed);
-    } catch (e) {
-      setSubmissions([]);
+      const { data: supabaseData, error } = await supabase
+        .from("form_submissions")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const mappedSubmissions = (supabaseData || []).map((sub) => ({
+        id: sub.id,
+        name: sub.name,
+        phone: sub.phone,
+        email: sub.email,
+        mentorship: sub.mentorship,
+        date: sub.created_at
+      }));
+
+      // Also merge any submissions from localStorage that are not in Supabase yet
+      const localData = localStorage.getItem("nebula_form_submissions");
+      if (localData) {
+        try {
+          const parsedLocal = JSON.parse(localData) as Submission[];
+          // Filter out the default mock submissions from local storage if they are there
+          const nonMockLocal = parsedLocal.filter(s => !s.id.startsWith("sub-"));
+          
+          // Filter out any local submission that already exists in Supabase
+          const uniqueLocal = nonMockLocal.filter(
+            local => !mappedSubmissions.some(sub => sub.id === local.id || (sub.email === local.email && sub.name === local.name))
+          );
+          
+          if (uniqueLocal.length > 0) {
+            mappedSubmissions.unshift(...uniqueLocal);
+          }
+        } catch (e) {
+          console.error("Error parsing local submissions:", e);
+        }
+      }
+
+      setSubmissions(mappedSubmissions);
+    } catch (error: any) {
+      console.error("Error loading submissions from Supabase:", error);
+      toast.error("Erro ao carregar do Supabase. Carregando dados locais...");
+      
+      // Fallback: load only from localStorage if Supabase is unavailable
+      let data = localStorage.getItem("nebula_form_submissions");
+      if (!data) {
+        localStorage.setItem("nebula_form_submissions", JSON.stringify(DEFAULT_SUBMISSIONS));
+        data = JSON.stringify(DEFAULT_SUBMISSIONS);
+      }
+      try {
+        const parsed = JSON.parse(data) as Submission[];
+        setSubmissions(parsed);
+      } catch (e) {
+        setSubmissions([]);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     loadSubmissions();
   }, []);
 
-  const handleClear = () => {
-    if (confirm("Tem certeza que deseja apagar todas as respostas recebidas?")) {
-      localStorage.removeItem("nebula_form_submissions");
-      setSubmissions([]);
-      setSelectedSub(null);
-      toast.success("Respostas limpas com sucesso!");
+  const handleClear = async () => {
+    if (confirm("Tem certeza que deseja apagar todas as respostas recebidas do banco de dados e localmente?")) {
+      setLoading(true);
+      try {
+        // Delete all submissions from Supabase
+        const { error } = await supabase.from("form_submissions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        if (error) throw error;
+        
+        localStorage.removeItem("nebula_form_submissions");
+        setSubmissions([]);
+        setSelectedSub(null);
+        toast.success("Todas as respostas foram excluídas com sucesso!");
+      } catch (error: any) {
+        console.error("Error clearing submissions:", error);
+        toast.error("Erro ao excluir do banco de dados.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering row click modal
-    const filtered = submissions.filter((s) => s.id !== id);
-    localStorage.setItem("nebula_form_submissions", JSON.stringify(filtered));
-    setSubmissions(filtered);
-    if (selectedSub?.id === id) {
-      setSelectedSub(null);
+    if (!confirm("Tem certeza que deseja excluir esta resposta?")) return;
+    
+    setLoading(true);
+    try {
+      // Check if it's a UUID (length 36) before attempting Supabase delete
+      if (id.length === 36) {
+        const { error } = await supabase
+          .from("form_submissions")
+          .delete()
+          .eq("id", id);
+          
+        if (error) throw error;
+      }
+      
+      // Also clean up local storage
+      const localData = localStorage.getItem("nebula_form_submissions");
+      if (localData) {
+        try {
+          const parsed = JSON.parse(localData) as Submission[];
+          const filteredLocal = parsed.filter((s) => s.id !== id);
+          localStorage.setItem("nebula_form_submissions", JSON.stringify(filteredLocal));
+        } catch (err) {
+          console.error("Error clearing local storage entry:", err);
+        }
+      }
+
+      const filtered = submissions.filter((s) => s.id !== id);
+      setSubmissions(filtered);
+      if (selectedSub?.id === id) {
+        setSelectedSub(null);
+      }
+      toast.success("Resposta removida com sucesso!");
+    } catch (error: any) {
+      console.error("Error deleting submission:", error);
+      toast.error("Erro ao excluir resposta do banco de dados.");
+    } finally {
+      setLoading(false);
     }
-    toast.success("Resposta removida com sucesso!");
   };
 
   const filtered = useMemo(() => {

@@ -197,6 +197,33 @@ export type Database = {
         }
         Relationships: []
       }
+      form_submissions: {
+        Row: {
+          id: string
+          name: string
+          phone: string
+          email: string
+          mentorship: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          phone: string
+          email: string
+          mentorship: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          phone?: string
+          email?: string
+          mentorship?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           color: string | null

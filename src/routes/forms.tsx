@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { ArrowRight, ArrowLeft, Check, Compass, HelpCircle, Pencil } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/forms")({
   component: FormsPage,
@@ -109,41 +110,75 @@ function FormsPage() {
     }
 
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    setLoading(false);
-    
     const finalMentorship = mentorship === "outra" ? customMentorship.trim() : mentorship;
-    const submissionId = currentSubmissionId || Math.random().toString(36).substring(2, 9);
-    const submission = {
-      id: submissionId,
-      name: name.trim(),
-      phone: phone.trim(),
-      email: email.trim().toLowerCase(),
-      mentorship: finalMentorship,
-      date: new Date().toISOString()
-    };
 
-    // Save to shared list of submissions in localStorage
-    const existingSubmissions = JSON.parse(localStorage.getItem("nebula_form_submissions") || "[]");
-    
-    if (currentSubmissionId) {
-      // Update existing submission if editing
-      const index = existingSubmissions.findIndex((s: any) => s.id === currentSubmissionId);
-      if (index !== -1) {
-        existingSubmissions[index] = submission;
+    try {
+      if (currentSubmissionId) {
+        // Update existing submission in Supabase
+        const { error } = await supabase
+          .from("form_submissions")
+          .update({
+            name: name.trim(),
+            phone: phone.trim(),
+            email: email.trim().toLowerCase(),
+            mentorship: finalMentorship
+          })
+          .eq("id", currentSubmissionId);
+
+        if (error) throw error;
+        toast.success("Informações atualizadas com sucesso!");
+      } else {
+        // Insert new submission into Supabase
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .insert({
+            name: name.trim(),
+            phone: phone.trim(),
+            email: email.trim().toLowerCase(),
+            mentorship: finalMentorship
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setCurrentSubmissionId(data.id);
+        }
+        toast.success("Enviado com sucesso!");
+      }
+      setSuccess(true);
+    } catch (error: any) {
+      console.error("Error submitting form:", error);
+      toast.error("Ocorreu um erro ao enviar para o servidor, salvando offline.");
+      
+      // Fallback to localStorage
+      const submissionId = currentSubmissionId || Math.random().toString(36).substring(2, 9);
+      const submission = {
+        id: submissionId,
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim().toLowerCase(),
+        mentorship: finalMentorship,
+        date: new Date().toISOString()
+      };
+      
+      const existingSubmissions = JSON.parse(localStorage.getItem("nebula_form_submissions") || "[]");
+      if (currentSubmissionId) {
+        const index = existingSubmissions.findIndex((s: any) => s.id === currentSubmissionId);
+        if (index !== -1) {
+          existingSubmissions[index] = submission;
+        } else {
+          existingSubmissions.unshift(submission);
+        }
       } else {
         existingSubmissions.unshift(submission);
+        setCurrentSubmissionId(submissionId);
       }
-    } else {
-      existingSubmissions.unshift(submission);
-      setCurrentSubmissionId(submissionId);
+      localStorage.setItem("nebula_form_submissions", JSON.stringify(existingSubmissions));
+      setSuccess(true);
+    } finally {
+      setLoading(false);
     }
-    
-    localStorage.setItem("nebula_form_submissions", JSON.stringify(existingSubmissions));
-    console.log("Registered submission:", submission);
-
-    setSuccess(true);
-    toast.success("Enviado com sucesso!");
   };
 
   const handleEditField = (targetStep: number) => {
