@@ -129,6 +129,20 @@
   .light *::-webkit-scrollbar-thumb:hover {
     background: oklch(0.5 0.02 270 / 0.5);
   }
+
+  /* Override browser autofill styling to match our branding and support dark/light modes */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover, 
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover, 
+  select:-webkit-autofill:focus,
+  select:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 100px var(--color-card, var(--card)) inset !important;
+    -webkit-text-fill-color: var(--foreground) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }
 
 /* Tiptap editor styles */
@@ -338,5 +352,13 @@
     .animate-ambient-pulse {
       animation: none;
     }
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

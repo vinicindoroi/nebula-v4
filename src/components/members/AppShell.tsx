@@ -2,7 +2,7 @@ import { Link, useRouterState, Outlet, useNavigate } from "@tanstack/react-route
 import {
   LayoutDashboard, GraduationCap, Users, User, Settings, Search, Bell,
   Menu, X, Orbit, LogOut, Shield, MessageSquare, Bookmark, GitBranch,
-  PanelLeftClose, PanelLeftOpen, StickyNote, HelpCircle,
+  PanelLeftClose, PanelLeftOpen, StickyNote, HelpCircle, Trello,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -18,7 +18,10 @@ type NavGroup = { label: string; items: NavItem[] };
 const navGroups: NavGroup[] = [
   {
     label: "Visão geral",
-    items: [{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    items: [
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/organizer", label: "Organização", icon: Trello },
+    ],
   },
   {
     label: "Aprendizado",
@@ -327,13 +330,14 @@ export function AppShell() {
               <span className="text-muted-foreground/40">/</span>
               <span className="text-foreground font-medium">{current}</span>
             </div>
-            <div className="flex-1 max-w-md mx-auto md:mx-0 md:ml-8">
+            <div className="hidden sm:block flex-1 max-w-md mx-auto md:mx-0 md:ml-8">
               <div className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <input
+                  type="search"
                   placeholder="Buscar conteúdos..."
-                  name="member-search"
                   autoComplete="off"
+                  data-lpignore="true"
                   className="w-full bg-white/[0.03] border border-white/10 rounded-full pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white/[0.05] transition"
                 />
               </div>

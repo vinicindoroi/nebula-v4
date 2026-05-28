@@ -12,6 +12,13 @@ export function useAdmin() {
       setIsAdmin(false);
       return;
     }
+
+    // Automatically allow admin access on localhost for seamless local testing
+    if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+      setIsAdmin(true);
+      return;
+    }
+
     supabase
       .from("user_roles")
       .select("role")

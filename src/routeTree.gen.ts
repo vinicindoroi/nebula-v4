@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as RespostasRouteImport } from './routes/respostas'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as FormsRouteImport } from './routes/forms'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
@@ -24,6 +26,7 @@ import { Route as AdminModulesRouteImport } from './routes/admin.modules'
 import { Route as AdminMembersRouteImport } from './routes/admin.members'
 import { Route as AdminLogsRouteImport } from './routes/admin.logs'
 import { Route as AdminFunnelsRouteImport } from './routes/admin.funnels'
+import { Route as AdminFormsRouteImport } from './routes/admin.forms'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCoursesRouteImport } from './routes/admin.courses'
 import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
@@ -33,6 +36,7 @@ import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSavedRouteImport } from './routes/_app.saved'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
+import { Route as AppOrganizerRouteImport } from './routes/_app.organizer'
 import { Route as AppNotesRouteImport } from './routes/_app.notes'
 import { Route as AppFunnelsRouteImport } from './routes/_app.funnels'
 import { Route as AppForumRouteImport } from './routes/_app.forum'
@@ -46,9 +50,19 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RespostasRoute = RespostasRouteImport.update({
+  id: '/respostas',
+  path: '/respostas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FormsRoute = FormsRouteImport.update({
+  id: '/forms',
+  path: '/forms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -115,6 +129,11 @@ const AdminFunnelsRoute = AdminFunnelsRouteImport.update({
   path: '/funnels',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFormsRoute = AdminFormsRouteImport.update({
+  id: '/forms',
+  path: '/forms',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -160,6 +179,11 @@ const AppProfileRoute = AppProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrganizerRoute = AppOrganizerRouteImport.update({
+  id: '/organizer',
+  path: '/organizer',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppNotesRoute = AppNotesRouteImport.update({
   id: '/notes',
   path: '/notes',
@@ -199,7 +223,9 @@ const AppCoursesCourseIdRoute = AppCoursesCourseIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/forms': typeof FormsRoute
   '/login': typeof LoginRoute
+  '/respostas': typeof RespostasRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/community': typeof AppCommunityRoute
   '/courses': typeof AppCoursesRouteWithChildren
@@ -207,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/forum': typeof AppForumRoute
   '/funnels': typeof AppFunnelsRoute
   '/notes': typeof AppNotesRoute
+  '/organizer': typeof AppOrganizerRoute
   '/profile': typeof AppProfileRoute
   '/saved': typeof AppSavedRoute
   '/settings': typeof AppSettingsRoute
@@ -216,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/forms': typeof AdminFormsRoute
   '/admin/funnels': typeof AdminFunnelsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/members': typeof AdminMembersRoute
@@ -231,7 +259,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/forms': typeof FormsRoute
   '/login': typeof LoginRoute
+  '/respostas': typeof RespostasRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/community': typeof AppCommunityRoute
   '/courses': typeof AppCoursesRouteWithChildren
@@ -239,6 +269,7 @@ export interface FileRoutesByTo {
   '/forum': typeof AppForumRoute
   '/funnels': typeof AppFunnelsRoute
   '/notes': typeof AppNotesRoute
+  '/organizer': typeof AppOrganizerRoute
   '/profile': typeof AppProfileRoute
   '/saved': typeof AppSavedRoute
   '/settings': typeof AppSettingsRoute
@@ -248,6 +279,7 @@ export interface FileRoutesByTo {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/forms': typeof AdminFormsRoute
   '/admin/funnels': typeof AdminFunnelsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/members': typeof AdminMembersRoute
@@ -265,7 +297,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
+  '/forms': typeof FormsRoute
   '/login': typeof LoginRoute
+  '/respostas': typeof RespostasRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_app/community': typeof AppCommunityRoute
   '/_app/courses': typeof AppCoursesRouteWithChildren
@@ -273,6 +307,7 @@ export interface FileRoutesById {
   '/_app/forum': typeof AppForumRoute
   '/_app/funnels': typeof AppFunnelsRoute
   '/_app/notes': typeof AppNotesRoute
+  '/_app/organizer': typeof AppOrganizerRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/saved': typeof AppSavedRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -282,6 +317,7 @@ export interface FileRoutesById {
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/courses': typeof AdminCoursesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/forms': typeof AdminFormsRoute
   '/admin/funnels': typeof AdminFunnelsRoute
   '/admin/logs': typeof AdminLogsRoute
   '/admin/members': typeof AdminMembersRoute
@@ -299,7 +335,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/forms'
     | '/login'
+    | '/respostas'
     | '/sitemap.xml'
     | '/community'
     | '/courses'
@@ -307,6 +345,7 @@ export interface FileRouteTypes {
     | '/forum'
     | '/funnels'
     | '/notes'
+    | '/organizer'
     | '/profile'
     | '/saved'
     | '/settings'
@@ -316,6 +355,7 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
+    | '/admin/forms'
     | '/admin/funnels'
     | '/admin/logs'
     | '/admin/members'
@@ -331,7 +371,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/forms'
     | '/login'
+    | '/respostas'
     | '/sitemap.xml'
     | '/community'
     | '/courses'
@@ -339,6 +381,7 @@ export interface FileRouteTypes {
     | '/forum'
     | '/funnels'
     | '/notes'
+    | '/organizer'
     | '/profile'
     | '/saved'
     | '/settings'
@@ -348,6 +391,7 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
+    | '/admin/forms'
     | '/admin/funnels'
     | '/admin/logs'
     | '/admin/members'
@@ -364,7 +408,9 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/admin'
+    | '/forms'
     | '/login'
+    | '/respostas'
     | '/sitemap.xml'
     | '/_app/community'
     | '/_app/courses'
@@ -372,6 +418,7 @@ export interface FileRouteTypes {
     | '/_app/forum'
     | '/_app/funnels'
     | '/_app/notes'
+    | '/_app/organizer'
     | '/_app/profile'
     | '/_app/saved'
     | '/_app/settings'
@@ -381,6 +428,7 @@ export interface FileRouteTypes {
     | '/admin/coupons'
     | '/admin/courses'
     | '/admin/dashboard'
+    | '/admin/forms'
     | '/admin/funnels'
     | '/admin/logs'
     | '/admin/members'
@@ -398,7 +446,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
+  FormsRoute: typeof FormsRoute
   LoginRoute: typeof LoginRoute
+  RespostasRoute: typeof RespostasRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
@@ -411,11 +461,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/respostas': {
+      id: '/respostas'
+      path: '/respostas'
+      fullPath: '/respostas'
+      preLoaderRoute: typeof RespostasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forms': {
+      id: '/forms'
+      path: '/forms'
+      fullPath: '/forms'
+      preLoaderRoute: typeof FormsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -509,6 +573,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFunnelsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/forms': {
+      id: '/admin/forms'
+      path: '/forms'
+      fullPath: '/admin/forms'
+      preLoaderRoute: typeof AdminFormsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/dashboard': {
       id: '/admin/dashboard'
       path: '/dashboard'
@@ -570,6 +641,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/organizer': {
+      id: '/_app/organizer'
+      path: '/organizer'
+      fullPath: '/organizer'
+      preLoaderRoute: typeof AppOrganizerRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notes': {
@@ -643,6 +721,7 @@ interface AppRouteChildren {
   AppForumRoute: typeof AppForumRoute
   AppFunnelsRoute: typeof AppFunnelsRoute
   AppNotesRoute: typeof AppNotesRoute
+  AppOrganizerRoute: typeof AppOrganizerRoute
   AppProfileRoute: typeof AppProfileRoute
   AppSavedRoute: typeof AppSavedRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -655,6 +734,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppForumRoute: AppForumRoute,
   AppFunnelsRoute: AppFunnelsRoute,
   AppNotesRoute: AppNotesRoute,
+  AppOrganizerRoute: AppOrganizerRoute,
   AppProfileRoute: AppProfileRoute,
   AppSavedRoute: AppSavedRoute,
   AppSettingsRoute: AppSettingsRoute,
@@ -669,6 +749,7 @@ interface AdminRouteChildren {
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminCoursesRoute: typeof AdminCoursesRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminFormsRoute: typeof AdminFormsRoute
   AdminFunnelsRoute: typeof AdminFunnelsRoute
   AdminLogsRoute: typeof AdminLogsRoute
   AdminMembersRoute: typeof AdminMembersRoute
@@ -688,6 +769,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCouponsRoute: AdminCouponsRoute,
   AdminCoursesRoute: AdminCoursesRoute,
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminFormsRoute: AdminFormsRoute,
   AdminFunnelsRoute: AdminFunnelsRoute,
   AdminLogsRoute: AdminLogsRoute,
   AdminMembersRoute: AdminMembersRoute,
@@ -706,7 +788,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
+  FormsRoute: FormsRoute,
   LoginRoute: LoginRoute,
+  RespostasRoute: RespostasRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport

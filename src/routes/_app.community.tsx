@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   MessageCircle, Heart, Trash2, Send, Image as ImageIcon,
   X, ChevronDown, ChevronUp, CornerDownRight, Bookmark,
+  Search, Share2, Sparkles, Filter, User, Plus
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -52,10 +53,139 @@ function CommunityPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  
+  // Controle de busca e abas
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"all" | "my" | "saved">("all");
+  const [limit, setLimit] = useState(10);
+
+  // --- STORIES 24H CONFIGS & STATES ---
+  type Story = {
+    id: string;
+    userName: string;
+    userAvatar: string;
+    gradient: string;
+    content: string;
+    date: string;
+    viewed?: boolean;
+  };
+
+  const [stories, setStories] = useState<Story[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nebula_community_stories");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (_) {}
+      }
+    }
+    return [
+      {
+        id: "st-1",
+        userName: "Thiago Mentor",
+        userAvatar: "TM",
+        gradient: "from-purple-600 via-pink-600 to-amber-500",
+        content: "Bati R$ 15k de faturamento hoje no dropshipping com o novo funil de conversão rápida! O ROAS disparou para 5.4x! 📈🚀",
+        date: "há 2 horas"
+      },
+      {
+        id: "st-2",
+        userName: "Carol Estrategista",
+        userAvatar: "CE",
+        gradient: "from-blue-600 to-violet-600",
+        content: "Dica de ouro para anúncios de tráfego: comecem com criativos focados na dor principal do cliente nos primeiros 3 segundos! A CTR média subiu para 3.8% nos testes. 🎯",
+        date: "há 5 horas"
+      },
+      {
+        id: "st-3",
+        userName: "Felipe Designer",
+        userAvatar: "FD",
+        gradient: "from-cyan-500 to-emerald-500",
+        content: "Nova identidade visual da área premium aprovada! A experiência gamificada vai contar com conquistas ainda mais imersivas. 🔥",
+        date: "há 8 horas"
+      },
+      {
+        id: "st-4",
+        userName: "Marina Copy",
+        userAvatar: "MC",
+        gradient: "from-orange-500 to-rose-500",
+        content: "Headline matadora validada na página de vendas do infoproduto. A taxa de conversão no checkout pulou de 1.2% para 2.45%! 📝💡",
+        date: "há 10 horas"
+      }
+    ];
+  });
+
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [storyProgress, setStoryProgress] = useState(0);
+  const [isCreatingStory, setIsCreatingStory] = useState(false);
+  const [newStoryText, setNewStoryText] = useState("");
+  const [newStoryGrad, setNewStoryGrad] = useState("from-purple-600 via-pink-600 to-amber-500");
+
+  // Stories auto-advance
+  useEffect(() => {
+    if (activeStoryIndex === null) return;
+    setStoryProgress(0);
+
+    const interval = setInterval(() => {
+      setStoryProgress((p) => {
+        if (p >= 100) {
+          clearInterval(interval);
+          if (activeStoryIndex < stories.length - 1) {
+            setActiveStoryIndex(activeStoryIndex + 1);
+          } else {
+            setActiveStoryIndex(null);
+          }
+          return 0;
+        }
+        return p + 1;
+      });
+    }, 40);
+
+    return () => clearInterval(interval);
+  }, [activeStoryIndex, stories.length]);
+
+  const handleCreateStory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStoryText.trim()) return;
+
+    const newStory: Story = {
+      id: "st-" + Date.now(),
+      userName: myProfile?.full_name || "Membro Star",
+      userAvatar: (myProfile?.full_name || "MS").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2),
+      gradient: newStoryGrad,
+      content: newStoryText.trim(),
+      date: "agora mesmo"
+    };
+
+    const updated = [newStory, ...stories];
+    setStories(updated);
+    localStorage.setItem("nebula_community_stories", JSON.stringify(updated));
+    setNewStoryText("");
+    setIsCreatingStory(false);
+    toast.success("Story operacional publicado!");
+    (window as any).sendNebulaNotification?.("Novo Story Publicado! 📱", "Seu story operacional já está disponível no topo do feed da comunidade.");
+  };
+
   const { data: savedPosts = [] } = useSavedPosts();
   const toggleSave = useToggleSave();
   const addXp = useAddXp();
   const { data: myXp = 0 } = useXp();
+
+  // Query para perfil do próprio usuário (para o avatar do composer)
+  const { data: myProfile } = useQuery({
+    queryKey: ["profile", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url, instagram, plan")
+        .eq("id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Realtime
   useEffect(() => {
@@ -76,11 +206,11 @@ function CommunityPage() {
   }, [user, qc]);
 
   const { data: posts = [], isLoading } = useQuery({
-    queryKey: ["posts", user?.id],
+    queryKey: ["posts", user?.id, limit],
     enabled: !!user,
     queryFn: async (): Promise<Post[]> => {
       const [pRes, lRes, cRes, profRes] = await Promise.all([
-        db.from("posts").select("*").order("created_at", { ascending: false }).limit(50),
+        db.from("posts").select("*").order("created_at", { ascending: false }).limit(limit),
         db.from("post_likes").select("post_id, user_id"),
         db.from("comments").select("*").order("created_at", { ascending: true }),
         db.from("profiles").select("id, full_name, avatar_url, instagram, xp"),
@@ -141,7 +271,13 @@ function CommunityPage() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { setText(""); removeImage(); qc.invalidateQueries({ queryKey: ["posts"] }); toast.success("Publicado"); },
+    onSuccess: () => { 
+      setText(""); 
+      removeImage(); 
+      qc.invalidateQueries({ queryKey: ["posts"] }); 
+      toast.success("Publicado na comunidade!"); 
+      (window as any).sendNebulaNotification?.("Publicação Concluída! 🚀", "Seu novo post foi enviado para o feed de insights da comunidade.");
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -179,6 +315,23 @@ function CommunityPage() {
   const initials = ((user?.user_metadata as any)?.full_name || user?.email || "M").slice(0, 2).toUpperCase();
   const remaining = MAX - text.length;
 
+  // Filtragem de Posts reativa
+  const filteredPosts = posts.filter((p) => {
+    // 1. Filtragem por Aba
+    if (activeTab === "my" && p.user_id !== user?.id) return false;
+    if (activeTab === "saved" && !savedPosts.some((s) => s.post_id === p.id)) return false;
+
+    // 2. Filtragem por Pesquisa
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const contentMatch = p.content?.toLowerCase().includes(q);
+      const authorMatch = p.author?.full_name?.toLowerCase().includes(q);
+      return contentMatch || authorMatch;
+    }
+
+    return true;
+  });
+
   return (
     <div className="flex justify-center gap-6 max-w-7xl mx-auto px-4">
       {/* Coluna Esquerda: Perfil & XP */}
@@ -188,37 +341,99 @@ function CommunityPage() {
 
       {/* Coluna Central: Feed */}
       <div className="flex-1 max-w-2xl space-y-5 py-2 min-w-0">
-        {/* Header */}
-        <div className="text-center space-y-1 pb-2">
-          <div className="inline-flex items-center gap-2 text-xs text-primary/80 font-medium">
-            <MessageCircle className="h-3.5 w-3.5" />
-            <span>{posts.length} publicações</span>
+        {/* Header da Comunidade */}
+        <div className="space-y-4 pb-2 animate-fade-up">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center gap-2 text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-full shadow-[0_2px_12px_rgba(var(--primary),0.05)]">
+              <Sparkles className="h-3 w-3 animate-pulse" />
+              <span>{posts.length} publicações na rede</span>
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-foreground/90 to-white/60 bg-clip-text text-transparent">Comunidade Nebula</h1>
+            <p className="text-sm text-muted-foreground/80 max-w-md mx-auto">Compartilhe insights, conecte-se com membros e ganhe XP participando.</p>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Comunidade</h1>
-          <p className="text-sm text-muted-foreground">Compartilhe, conecte-se e inspire.</p>
+
+          {/* Barra de Pesquisa & Filtros */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            {/* Campo de Pesquisa */}
+            <div className="relative flex-1 group">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/45 transition-colors group-hover:text-primary group-focus-within:text-primary" />
+              <input
+                type="text"
+                placeholder="Pesquisar publicações ou membros..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 focus:bg-white/[0.04] focus:shadow-glow transition-all duration-300"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-white/5 text-muted-foreground/50 hover:text-foreground transition"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Abas do Feed */}
+            <div className="flex bg-white/[0.02] border border-white/[0.06] p-1 rounded-xl items-center gap-1 shrink-0">
+              <button
+                onClick={() => setActiveTab("all")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                  activeTab === "all"
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                }`}
+              >
+                <Sparkles className="h-3 w-3" />
+                Geral
+              </button>
+              <button
+                onClick={() => setActiveTab("my")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                  activeTab === "my"
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                }`}
+              >
+                <User className="h-3 w-3" />
+                Meus Posts
+              </button>
+              <button
+                onClick={() => setActiveTab("saved")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                  activeTab === "saved"
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                }`}
+              >
+                <Bookmark className="h-3 w-3" />
+                Salvos
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Composer */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-sm overflow-hidden">
+        {/* Composer (Novo Post) */}
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.015] backdrop-blur-md overflow-hidden transition-all duration-300 focus-within:border-primary/40 focus-within:shadow-glow focus-within:bg-white/[0.03] animate-fade-up">
           <div className="px-5 pt-4 pb-3">
             <div className="flex items-center gap-3 mb-3">
-              <Avatar initials={initials} xp={myXp} />
-              <span className="text-sm font-medium text-foreground/80">Nova publicação</span>
+              <Avatar initials={initials} xp={myXp} avatarUrl={myProfile?.avatar_url} />
+              <span className="text-sm font-semibold text-foreground/80">Nova publicação</span>
             </div>
             <RichTextEditor
               content={text}
               onChange={(html) => setText(html.slice(0, MAX))}
-              placeholder="O que está pensando?"
+              placeholder="O que está pensando hoje para compartilhar?"
               minHeight="80px"
             />
           </div>
 
           {imagePreview && (
-            <div className="relative mx-5 mb-3 rounded-xl overflow-hidden border border-white/10 max-h-56">
+            <div className="relative mx-5 mb-3 rounded-xl overflow-hidden border border-white/10 max-h-56 animate-fade-up">
               <img src={imagePreview} alt="Preview" className="w-full h-full object-cover max-h-56" />
               <button
                 onClick={removeImage}
-                className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/70 backdrop-blur-sm flex items-center justify-center hover:bg-black/90 transition"
+                className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/70 backdrop-blur-sm flex items-center justify-center hover:bg-black/90 transition shadow-lg"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -228,16 +443,16 @@ function CommunityPage() {
           <div className="px-5 py-3 border-t border-white/[0.06] bg-white/[0.01] flex items-center justify-between">
             <div className="flex gap-1 text-muted-foreground">
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={handleImageSelect} />
-              <button type="button" onClick={() => fileRef.current?.click()} className="p-2 rounded-xl hover:bg-white/5 hover:text-foreground transition" title="Imagem">
+              <button type="button" onClick={() => fileRef.current?.click()} className="p-2 rounded-xl hover:bg-white/5 hover:text-foreground transition-all duration-200 hover:scale-105 active:scale-95" title="Adicionar Imagem">
                 <ImageIcon className="h-4 w-4" />
               </button>
             </div>
             <div className="flex items-center gap-3">
-              <span className={`text-[11px] tabular-nums ${remaining < 100 ? "text-amber-400" : "text-muted-foreground/40"}`}>{remaining}</span>
+              <span className={`text-[11px] font-mono tabular-nums ${remaining < 100 ? "text-amber-400 font-bold" : "text-muted-foreground/45"}`}>{remaining}</span>
               <button
                 onClick={() => create.mutate()}
                 disabled={(!text.trim() && !imageFile) || create.isPending}
-                className="gradient-primary text-primary-foreground rounded-xl px-4 py-2 text-xs font-medium flex items-center gap-2 disabled:opacity-40 transition shadow-[0_4px_16px_-4px_oklch(0.65_0.22_290/0.5)]"
+                className="gradient-primary text-primary-foreground rounded-xl px-4 py-2 text-xs font-semibold flex items-center gap-2 disabled:opacity-40 transition-all hover:scale-102 hover:brightness-105 shadow-[0_4px_16px_-4px_oklch(0.65_0.22_290/0.5)] active:scale-98"
               >
                 <Send className="h-3.5 w-3.5" />
                 {create.isPending ? "Publicando..." : "Publicar"}
@@ -246,32 +461,251 @@ function CommunityPage() {
           </div>
         </div>
 
-        {/* Feed */}
+        {/* Stories Operacionais Rápidos (Feature 5) */}
+        <div className="relative overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.015] p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 text-primary animate-pulse" /> Stories Operacionais (24h)
+            </span>
+            <span className="text-[9px] text-muted-foreground/45 font-semibold">Poste faturamentos ou insights</span>
+          </div>
+
+          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1.5 select-none touch-pan-x">
+            {/* Novo Story Button */}
+            <div className="flex flex-col items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCreatingStory(true)}
+                className="h-14 w-14 rounded-full border border-dashed border-white/20 hover:border-primary/50 bg-white/[0.02] flex items-center justify-center text-muted-foreground hover:text-primary transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative group"
+              >
+                <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Plus className="h-5 w-5" />
+              </button>
+              <span className="text-[9px] text-muted-foreground font-medium">Novo Story</span>
+            </div>
+
+            {/* Stories List */}
+            {stories.map((st, idx) => (
+              <div key={st.id} className="flex flex-col items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveStoryIndex(idx);
+                    setStoryProgress(0);
+                    const updated = stories.map((s, i) => i === idx ? { ...s, viewed: true } : s);
+                    setStories(updated);
+                    localStorage.setItem("nebula_community_stories", JSON.stringify(updated));
+                  }}
+                  className={`h-14 w-14 rounded-full p-[2.5px] bg-gradient-to-tr transition-all duration-300 hover:scale-105 cursor-pointer active:scale-95 ${
+                    st.viewed 
+                      ? "from-white/10 to-white/5 border border-white/5 shadow-inner" 
+                      : "from-primary via-pink-500 to-amber-400 p-[3px] shadow-[0_0_12px_rgba(167,139,250,0.25)] animate-pulse"
+                  }`}
+                >
+                  <div className="h-full w-full rounded-full bg-[#0c0c0e] flex items-center justify-center border border-black/40 overflow-hidden relative">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${st.gradient} opacity-20`} />
+                    <span className="text-xs font-black text-foreground relative z-10 tracking-tight">{st.userAvatar}</span>
+                  </div>
+                </button>
+                <span className="text-[9px] text-muted-foreground/80 font-semibold max-w-[65px] truncate">{st.userName.split(" ")[0]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Visualizador de Story Overlay */}
+        {activeStoryIndex !== null && (() => {
+          const activeStory = stories[activeStoryIndex];
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in" onClick={() => setActiveStoryIndex(null)}>
+              <div className="relative w-full max-w-sm aspect-[9/16] bg-gradient-to-b from-[#161618] to-[#0c0c0e] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between p-6 mx-4" onClick={(e) => e.stopPropagation()}>
+                
+                {/* Progress Bar Indicators */}
+                <div className="flex gap-1.5 w-full absolute top-4 left-0 px-4 z-20">
+                  {stories.map((_, i) => {
+                    let widthVal = 0;
+                    if (i < activeStoryIndex) widthVal = 100;
+                    else if (i === activeStoryIndex) widthVal = storyProgress;
+                    return (
+                      <div key={i} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+                        <div className="h-full bg-white transition-all duration-[40ms] ease-linear" style={{ width: `${widthVal}%` }} />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Story Header */}
+                <div className="flex items-center justify-between mt-3 z-10">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-8 w-8 rounded-full bg-gradient-to-br ${activeStory.gradient} flex items-center justify-center font-bold text-xs border border-white/10 shadow text-white`}>
+                      {activeStory.userAvatar}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-foreground">{activeStory.userName}</div>
+                      <div className="text-[9px] text-muted-foreground/60">{activeStory.date}</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveStoryIndex(null)}
+                    className="p-1 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Tap Left / Right Areas for navigation */}
+                <div className="absolute inset-x-0 top-16 bottom-20 flex z-10 pointer-events-auto">
+                  <div 
+                    className="w-1/3 h-full cursor-w-resize" 
+                    onClick={() => {
+                      if (activeStoryIndex > 0) setActiveStoryIndex(activeStoryIndex - 1);
+                      else setActiveStoryIndex(null);
+                    }}
+                  />
+                  <div className="w-1/3 h-full" onClick={() => setActiveStoryIndex(null)} />
+                  <div 
+                    className="w-1/3 h-full cursor-e-resize" 
+                    onClick={() => {
+                      if (activeStoryIndex < stories.length - 1) setActiveStoryIndex(activeStoryIndex + 1);
+                      else setActiveStoryIndex(null);
+                    }}
+                  />
+                </div>
+
+                {/* Story Body Card with Glowing Premium Design */}
+                <div className={`flex-1 mx-2 my-6 rounded-2xl bg-gradient-to-br ${activeStory.gradient} p-6 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-xl border border-white/10`}>
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+                  <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 rounded-full blur-2xl" />
+                  <p className="text-md sm:text-lg font-black text-white leading-relaxed z-10 tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                    "{activeStory.content}"
+                  </p>
+                </div>
+
+                {/* Quick Footer Action */}
+                <div className="text-center text-[10px] text-muted-foreground z-10 flex justify-center items-center gap-1 pb-1">
+                  <Sparkles className="h-3 w-3 text-primary" /> Toque nas laterais para navegar
+                </div>
+
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Story Creator Overlay */}
+        {isCreatingStory && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm animate-fade-in" onClick={() => setIsCreatingStory(false)}>
+            <form onSubmit={handleCreateStory} className="w-full max-w-md bg-[#0c0c0e] border border-white/10 rounded-2xl p-6 shadow-2xl space-y-4 mx-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                  <Plus className="h-4 w-4 text-primary" /> Publicar Story Operacional
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingStory(false)}
+                  className="p-1 rounded-full hover:bg-white/5 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Qual é o seu faturamento ou dica de hoje?</span>
+                  <textarea
+                    required
+                    maxLength={160}
+                    placeholder="Ex: Novo recorde! R$ 4.2k faturados hoje de manhã no tráfego direto! 📈🔥"
+                    value={newStoryText}
+                    onChange={(e) => setNewStoryText(e.target.value)}
+                    className="w-full h-24 bg-white/[0.02] border border-white/10 rounded-xl p-3 text-xs text-foreground placeholder:text-muted-foreground/35 outline-none focus:border-primary/50 transition-all resize-none bg-background"
+                  />
+                  <span className="text-[9px] text-muted-foreground/40 block text-right mt-0.5">{160 - newStoryText.length} caracteres restantes</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Escolha a cor do seu Story</span>
+                  <div className="flex gap-2">
+                    {[
+                      { id: "from-purple-600 via-pink-600 to-amber-500", label: "Magma" },
+                      { id: "from-blue-600 to-indigo-600", label: "Estelar" },
+                      { id: "from-cyan-500 to-emerald-500", label: "Esmeralda" },
+                      { id: "from-orange-500 to-rose-500", label: "Crepúsculo" },
+                      { id: "from-[#0f0c29] via-[#302b63] to-[#24243e]", label: "Nebulosa" }
+                    ].map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setNewStoryGrad(g.id)}
+                        className={`flex-1 h-8 rounded-lg bg-gradient-to-br ${g.id} border hover:scale-105 active:scale-95 transition-all text-[8px] font-black text-white flex items-center justify-center select-none cursor-pointer ${
+                          newStoryGrad === g.id ? "border-white scale-102 ring-2 ring-primary/20 shadow-md" : "border-white/10 hover:border-white/30"
+                        }`}
+                        title={g.label}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview Story */}
+              <div className="pt-2">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Prévia do Layout</span>
+                <div className={`w-full aspect-[16/9] rounded-xl bg-gradient-to-br ${newStoryGrad} p-4 flex items-center justify-center text-center border border-white/10 shadow relative overflow-hidden`}>
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl" />
+                  <p className="text-[10px] font-black text-white max-w-[200px] leading-relaxed select-none drop-shadow">
+                    "{newStoryText.trim() || "Digite um texto acima..."}"
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-xl gradient-primary text-white text-xs font-bold shadow-md hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Send className="h-3.5 w-3.5" /> Publicar Story no Mural
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Feed de Publicações */}
         {isLoading ? (
           <div className="space-y-4">
             {[0, 1, 2].map((i) => (
               <div key={i} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 h-36 animate-pulse" />
             ))}
           </div>
-        ) : posts.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-16 text-center">
+        ) : filteredPosts.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.015] p-16 text-center animate-fade-up">
             <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground/20 mb-3" strokeWidth={1.2} />
-            <div className="text-sm font-medium">Nenhuma publicação ainda</div>
-            <p className="text-xs text-muted-foreground mt-1">Seja o primeiro a compartilhar algo.</p>
+            <div className="text-sm font-semibold">Nenhuma publicação encontrada</div>
+            <p className="text-xs text-muted-foreground/70 mt-1">Experimente mudar o filtro ou fazer outra busca.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {posts.map((p) => (
+          <div className="space-y-4 stagger-enter">
+            {filteredPosts.map((p) => (
               <PostCard
                 key={p.id}
                 post={p}
                 userId={user!.id}
                 saved={savedPosts.some((s) => s.post_id === p.id)}
                 onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })}
-                onDelete={() => { if (confirm("Apagar publicação?")) remove.mutate(p.id); }}
+                onDelete={() => { if (confirm("Deseja realmente apagar esta publicação?")) remove.mutate(p.id); }}
                 onSave={() => toggleSave.mutate({ postId: p.id, postType: "community", saved: savedPosts.some((s) => s.post_id === p.id) })}
               />
             ))}
+            {filteredPosts.length >= limit && (
+              <div className="pt-4 flex justify-center pb-8 animate-fade-up">
+                <button
+                  onClick={() => setLimit((l) => l + 10)}
+                  className="px-6 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-primary/30 text-xs font-bold text-foreground transition-all duration-300 hover:scale-102 cursor-pointer shadow-md"
+                >
+                  Carregar mais publicações ➔
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -305,98 +739,101 @@ function ProfileSidebarWidget() {
   const levelInfo = getLevel(xp);
 
   const getRankColor = (lvl: number) => {
-    if (lvl >= 8) return "from-yellow-400 to-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.4)]";
-    if (lvl >= 7) return "from-fuchsia-500 to-purple-600 shadow-[0_0_12px_rgba(168,85,247,0.4)]";
-    if (lvl >= 6) return "from-violet-500 to-indigo-600 shadow-[0_0_12px_rgba(99,102,241,0.4)]";
-    if (lvl >= 5) return "from-blue-500 to-cyan-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]";
-    if (lvl >= 4) return "from-teal-500 to-emerald-500";
-    if (lvl >= 3) return "from-emerald-500 to-green-500";
-    if (lvl >= 2) return "from-orange-500 to-red-500";
-    return "from-slate-500 to-slate-600";
+    if (lvl >= 8) return "from-amber-400 to-yellow-300 text-yellow-950 ring-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.4)]";
+    if (lvl >= 7) return "from-fuchsia-500 to-purple-600 text-white ring-purple-500/40 shadow-[0_0_15px_rgba(168,85,247,0.4)]";
+    if (lvl >= 6) return "from-indigo-500 to-violet-600 text-white ring-indigo-500/40 shadow-[0_0_15px_rgba(99,102,241,0.4)]";
+    if (lvl >= 5) return "from-blue-500 to-cyan-400 text-white ring-blue-500/30 shadow-[0_0_12px_rgba(59,130,246,0.3)]";
+    if (lvl >= 4) return "from-teal-500 to-emerald-400 text-white ring-teal-500/30";
+    if (lvl >= 3) return "from-emerald-500 to-green-400 text-white ring-emerald-500/30";
+    if (lvl >= 2) return "from-orange-500 to-red-500 text-white ring-orange-500/30";
+    return "from-slate-500 to-slate-400 text-white ring-white/10";
   };
 
   const rankColor = getRankColor(levelInfo.level);
 
   return (
-    <div className="sticky top-4 rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-sm overflow-hidden shadow-xl">
-      {/* Banner Capa */}
-      <div className="h-20 w-full bg-gradient-to-r from-violet-600/30 via-primary/30 to-pink-600/30 relative">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
+    <div className="sticky top-4 rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-md overflow-hidden shadow-xl transition-all duration-300 hover:shadow-glow hover:border-white/[0.12] group/profile">
+      {/* Banner Capa Premium com Efeito Nebulosa Animado */}
+      <div className="h-24 w-full bg-gradient-to-tr from-violet-600 via-primary to-pink-500 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/15 via-transparent to-transparent opacity-80 animate-ambient-pulse" />
+        <div className="absolute inset-0 bg-black/20" />
       </div>
 
       {/* Avatar flutuante e Informações básicas */}
-      <div className="relative px-4 pb-4 pt-10 text-center flex flex-col items-center border-b border-white/[0.06]">
+      <div className="relative px-4 pb-4 pt-12 text-center flex flex-col items-center border-b border-white/[0.06] bg-white/[0.01]">
         <div className="absolute -top-10 left-1/2 -translate-x-1/2">
-          {myProfile?.avatar_url ? (
-            <img
-              src={myProfile.avatar_url}
-              alt={name}
-              className="h-16 w-16 rounded-2xl object-cover border-2 border-background shadow-lg ring-2 ring-white/10"
-            />
-          ) : (
-            <div className="h-16 w-16 rounded-2xl gradient-primary flex items-center justify-center text-xl font-bold text-white border-2 border-background shadow-lg ring-2 ring-white/10">
-              {initials}
-            </div>
-          )}
+          <div className="relative">
+            <Avatar initials={initials} size="lg" xp={xp} avatarUrl={myProfile?.avatar_url} />
+            <span className={`absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background text-[10px] font-bold bg-gradient-to-r ${rankColor} shadow-[0_2px_8px_rgba(0,0,0,0.5)]`}>
+              {levelInfo.level}
+            </span>
+          </div>
         </div>
 
-        <h3 className="text-sm font-semibold truncate max-w-full text-foreground/90">{name}</h3>
+        <h3 className="text-sm font-semibold truncate max-w-full text-foreground/90 mt-1">{name}</h3>
+        
         {myProfile?.instagram && (
           <a
             href={`https://instagram.com/${myProfile.instagram.replace("@", "")}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-pink-400/80 hover:text-pink-400 transition mt-0.5 flex items-center gap-1"
+            className="text-[11px] text-pink-400/80 hover:text-pink-400 transition mt-1 flex items-center gap-1 font-medium bg-pink-500/5 px-2 py-0.5 rounded-full border border-pink-500/10"
           >
             @{myProfile.instagram.replace("@", "")}
           </a>
         )}
+        
         {myProfile?.plan && myProfile.plan !== "Free" && (
-          <span className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] font-semibold text-primary uppercase tracking-wider">
+          <span className="mt-2.5 inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/25 text-[9px] font-bold text-primary uppercase tracking-wider shadow-[0_2px_8px_rgba(var(--primary),0.1)]">
             {myProfile.plan}
           </span>
         )}
       </div>
 
       {/* XP e Gamificação */}
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3.5 bg-white/[0.01]">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold text-white bg-gradient-to-r ${rankColor}`}>
-              Nível {levelInfo.level}
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground/80">{levelInfo.title}</span>
+          <div className="flex flex-col items-start gap-0.5">
+            <span className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-wider">Patente</span>
+            <span className="text-xs font-semibold text-foreground/90">{levelInfo.title}</span>
           </div>
-          <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+          <span className="text-[10px] text-muted-foreground/60 font-mono bg-white/5 px-2 py-1 rounded border border-white/[0.04]">
             {levelInfo.currentXp} / {levelInfo.nextLevelXp} XP
           </span>
         </div>
 
-        {/* Barra de Progresso */}
-        <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden border border-white/[0.04] p-[1px]">
-          <div
-            className={`h-full rounded-full bg-gradient-to-r ${rankColor} transition-all duration-500`}
-            style={{ width: `${Math.min(100, (levelInfo.currentXp / levelInfo.nextLevelXp) * 100)}%` }}
-          />
+        {/* Barra de Progresso Premium */}
+        <div className="relative">
+          <div className="h-2.5 w-full rounded-full bg-white/5 overflow-hidden border border-white/[0.04] p-[1px]">
+            <div
+              className={`h-full rounded-full bg-gradient-to-r ${rankColor} transition-all duration-500 relative`}
+              style={{ width: `${Math.min(100, (levelInfo.currentXp / levelInfo.nextLevelXp) * 100)}%` }}
+            >
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.15)_50%,transparent_100%)] animate-pulse" />
+            </div>
+          </div>
+          <div className="absolute right-0 -bottom-5 text-[9px] text-muted-foreground/40 font-medium">
+            {Math.round((levelInfo.currentXp / levelInfo.nextLevelXp) * 100)}% concluído
+          </div>
         </div>
 
-        <p className="text-[10px] text-muted-foreground/50 text-center leading-normal">
-          Ganhe XP interagindo na comunidade e completando aulas!
+        <p className="text-[10px] text-muted-foreground/50 text-center leading-normal pt-2.5">
+          Participe das discussões e assista às aulas para evoluir de nível!
         </p>
       </div>
     </div>
   );
 }
 
-/* ─── Avatar ─── */
+/* ─── Avatar & Level Badge Premium ─── */
 
 function LevelBadge({ xp }: { xp: number }) {
   const levelInfo = getLevel(xp);
   const getRankColor = (lvl: number) => {
-    if (lvl >= 8) return "from-yellow-400/20 to-amber-500/20 text-amber-300 border-amber-500/30";
-    if (lvl >= 7) return "from-fuchsia-500/20 to-purple-600/20 text-purple-300 border-purple-500/30";
-    if (lvl >= 6) return "from-violet-500/20 to-indigo-600/20 text-indigo-300 border-indigo-500/30";
-    if (lvl >= 5) return "from-blue-500/20 to-cyan-500/20 text-blue-300 border-blue-500/30";
+    if (lvl >= 8) return "from-yellow-400/20 to-amber-500/20 text-amber-300 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]";
+    if (lvl >= 7) return "from-fuchsia-500/20 to-purple-600/20 text-purple-300 border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.15)]";
+    if (lvl >= 6) return "from-violet-500/20 to-indigo-600/20 text-indigo-300 border-indigo-500/30 shadow-[0_0_8px_rgba(99,102,241,0.15)]";
+    if (lvl >= 5) return "from-blue-500/20 to-cyan-500/20 text-blue-300 border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.1)]";
     if (lvl >= 4) return "from-teal-500/20 to-emerald-500/20 text-emerald-300 border-teal-500/30";
     if (lvl >= 3) return "from-emerald-500/20 to-green-500/20 text-green-300 border-emerald-500/30";
     if (lvl >= 2) return "from-orange-500/20 to-red-500/20 text-orange-300 border-orange-500/30";
@@ -404,21 +841,21 @@ function LevelBadge({ xp }: { xp: number }) {
   };
 
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full border text-[9px] font-semibold bg-gradient-to-r ${getRankColor(levelInfo.level)}`}>
-      Lv. {levelInfo.level} • {levelInfo.title}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-bold bg-gradient-to-r backdrop-blur-sm tracking-wide ${getRankColor(levelInfo.level)}`}>
+      Nível {levelInfo.level} • {levelInfo.title}
     </span>
   );
 }
 
-function Avatar({ initials, size = "md", xp = 0 }: { initials: string; size?: "sm" | "md"; xp?: number }) {
+function Avatar({ initials, size = "md", xp = 0, avatarUrl = null }: { initials: string; size?: "sm" | "md" | "lg"; xp?: number; avatarUrl?: string | null }) {
   const levelInfo = getLevel(xp);
-  const cls = size === "sm" ? "h-7 w-7 text-[10px]" : "h-10 w-10 text-xs";
+  const cls = size === "sm" ? "h-8 w-8 text-[10px]" : size === "lg" ? "h-20 w-20 text-xl border-4 border-background shadow-2xl" : "h-10 w-10 text-xs";
 
   const getRingColor = (lvl: number) => {
-    if (lvl >= 8) return "ring-amber-500/40 shadow-[0_0_8px_rgba(245,158,11,0.3)]";
-    if (lvl >= 7) return "ring-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)]";
-    if (lvl >= 6) return "ring-indigo-500/40 shadow-[0_0_8px_rgba(99,102,241,0.3)]";
-    if (lvl >= 5) return "ring-blue-500/30 shadow-[0_0_6px_rgba(59,130,246,0.25)]";
+    if (lvl >= 8) return "ring-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.35)]";
+    if (lvl >= 7) return "ring-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.35)]";
+    if (lvl >= 6) return "ring-indigo-500/40 shadow-[0_0_10px_rgba(99,102,241,0.35)]";
+    if (lvl >= 5) return "ring-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.25)]";
     if (lvl >= 4) return "ring-teal-500/30";
     if (lvl >= 3) return "ring-emerald-500/30";
     if (lvl >= 2) return "ring-orange-500/30";
@@ -428,8 +865,14 @@ function Avatar({ initials, size = "md", xp = 0 }: { initials: string; size?: "s
   const ringCls = getRingColor(levelInfo.level);
 
   return (
-    <div className={`${cls} rounded-full gradient-primary flex items-center justify-center font-semibold text-primary-foreground shrink-0 ring-2 ${ringCls}`}>
-      {initials}
+    <div className={`${cls} rounded-full shrink-0 ring-2 ${ringCls} overflow-hidden bg-background flex items-center justify-center font-bold text-primary-foreground`}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover transition-transform duration-300 hover:scale-110" />
+      ) : (
+        <div className="h-full w-full gradient-primary flex items-center justify-center uppercase">
+          {initials}
+        </div>
+      )}
     </div>
   );
 }
@@ -443,32 +886,49 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
   const mine = post.user_id === userId;
   const xpValue = post.author?.xp ?? 0;
 
+  const handleShare = () => {
+    // Cria um texto amigável com um link simulado para a comunidade
+    const textSnippet = post.content ? post.content.replace(/<[^>]*>/g, '').slice(0, 80) + "..." : "uma imagem";
+    const shareText = `Confira a publicação de ${name} na Comunidade Nebula:\n"${textSnippet}"\n\nParticipe você também!`;
+    navigator.clipboard.writeText(shareText);
+    toast.success("Mensagem de compartilhamento copiada para o seu CTRL+V!");
+  };
+
   return (
-    <article className="rounded-2xl border border-white/[0.06] bg-white/[0.015] backdrop-blur-sm overflow-hidden hover:bg-white/[0.02] hover:border-white/[0.09] hover:shadow-[0_8px_32px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 group">
+    <article className="rounded-2xl border border-white/[0.06] bg-white/[0.015] backdrop-blur-md overflow-hidden hover:bg-white/[0.02] hover:border-white/[0.1] hover:shadow-glass transition-all duration-300 group relative">
+      {/* Linha vertical conectora de threads para comentários aberta */}
+      {showComments && (
+        <div className="absolute top-[60px] bottom-0 left-[29px] w-[1px] bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
+      )}
+      
       {/* Author header */}
-      <div className="px-5 pt-5 pb-0 flex items-center gap-3 relative">
-        {showComments && (
-          <div className="absolute top-[52px] bottom-0 left-[39px] w-[1.5px] bg-white/5" />
-        )}
-        <Avatar initials={initial} xp={xpValue} />
+      <div className="px-5 pt-5 pb-0 flex items-center gap-3 relative z-10">
+        <Avatar initials={initial} xp={xpValue} avatarUrl={post.author?.avatar_url} />
+        
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-foreground/90 truncate">{name}</span>
+            <span className="text-sm font-semibold text-foreground/95 truncate hover:text-primary transition-colors cursor-default">{name}</span>
             <LevelBadge xp={xpValue} />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground/70">{formatTime(post.created_at)}</span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px] text-muted-foreground/60 font-medium">{formatTime(post.created_at)}</span>
             {post.author?.instagram && (
-              <a href={`https://instagram.com/${post.author.instagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="text-[11px] text-pink-400/70 hover:text-pink-400 transition">
+              <a 
+                href={`https://instagram.com/${post.author.instagram.replace("@", "")}`} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-[10px] text-pink-400/70 hover:text-pink-400 font-medium transition-colors"
+              >
                 @{post.author.instagram.replace("@", "")}
               </a>
             )}
           </div>
         </div>
+        
         {mine && (
           <button
             onClick={onDelete}
-            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 p-2 rounded-xl hover:bg-red-500/10 transition-all"
+            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 p-2 rounded-xl hover:bg-red-500/10 transition-all duration-200"
             aria-label="Apagar"
           >
             <Trash2 className="h-4 w-4" />
@@ -478,39 +938,42 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
 
       {/* Content */}
       {post.content && (
-        <div className="px-5 pt-3 pb-1">
-          <div className="text-[14px] leading-[1.7] break-words prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
+        <div className="px-5 pt-3 pb-1 relative z-10 pl-[62px]">
+          <div className="text-[13px] leading-[1.6] break-words text-foreground/90 prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
         </div>
       )}
 
       {/* Image */}
       {post.image_url && (
-        <div className="mt-3 mx-5 rounded-xl overflow-hidden border border-white/[0.06]">
+        <div className="mt-3 mx-5 rounded-xl overflow-hidden border border-white/[0.06] ml-[62px] relative z-10 group/img shadow-md">
           <img
             src={post.image_url}
             alt="Post"
-            className="w-full max-h-[420px] object-cover"
+            className="w-full max-h-[380px] object-cover transition-transform duration-500 group-hover/img:scale-101"
             loading="lazy"
           />
         </div>
       )}
 
-      {/* Actions */}
-      <div className="px-5 py-3 mt-2 flex items-center gap-2">
+      {/* Actions (Curtir, Comentar, Salvar, Compartilhar) */}
+      <div className="px-5 py-3.5 mt-2 flex items-center gap-2 pl-[62px] border-t border-white/[0.02] relative z-10">
+        {/* Curtir */}
         <button
           onClick={onLike}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 hover:scale-105 active:scale-95 ${
             post.liked
-              ? "text-rose-400 bg-rose-500/10 border border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+              ? "text-rose-400 bg-rose-500/10 border border-rose-500/25 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
               : "text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent"
           }`}
         >
-          <Heart className={`h-4 w-4 transition-transform duration-200 ${post.liked ? "scale-110" : ""}`} fill={post.liked ? "currentColor" : "none"} />
+          <Heart className={`h-4 w-4 transition-transform duration-300 ${post.liked ? "scale-120 animate-ambient-pulse" : ""}`} fill={post.liked ? "currentColor" : "none"} />
           <span className="tabular-nums">{post.likes || ""}</span>
         </button>
+
+        {/* Comentar */}
         <button
           onClick={() => setShowComments(!showComments)}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border duration-200 hover:scale-105 active:scale-95 ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border duration-200 hover:scale-105 active:scale-95 ${
             showComments
               ? "text-foreground bg-white/5 border-white/10"
               : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-transparent"
@@ -520,11 +983,22 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
           <span className="tabular-nums">{post.commentCount || ""}</span>
           {post.commentCount > 0 && (showComments ? <ChevronUp className="h-3 w-3 ml-0.5" /> : <ChevronDown className="h-3 w-3 ml-0.5" />)}
         </button>
+
+        {/* Compartilhar */}
+        <button
+          onClick={handleShare}
+          className="inline-flex items-center justify-center p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent transition-all duration-200 hover:scale-105 active:scale-95"
+          title="Compartilhar publicação"
+        >
+          <Share2 className="h-4 w-4" />
+        </button>
+
+        {/* Salvar */}
         <button
           onClick={onSave}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border duration-200 hover:scale-105 active:scale-95 ml-auto ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border duration-200 hover:scale-105 active:scale-95 ml-auto ${
             saved
-              ? "text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+              ? "text-amber-400 bg-amber-500/10 border-amber-500/25 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
               : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-transparent"
           }`}
         >
@@ -532,7 +1006,7 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
         </button>
       </div>
 
-      {/* Comments */}
+      {/* Comments section */}
       {showComments && (
         <CommentSection postId={post.id} postOwnerId={post.user_id} comments={post.comments} userId={userId} />
       )}
@@ -607,42 +1081,43 @@ function CommentSection({ postId, postOwnerId, comments, userId }: { postId: str
   };
 
   return (
-    <div className="border-t border-white/[0.06] bg-white/[0.01]">
+    <div className="border-t border-white/[0.05] bg-black/15 pb-2 animate-fade-up">
       {comments.length > 0 && (
-        <div className="px-5 py-4 space-y-4 max-h-[360px] overflow-y-auto">
+        <div className="px-5 py-4 space-y-4 max-h-[380px] overflow-y-auto pl-[62px]">
           {comments.map((c, index) => {
             const cName = c.author?.full_name || "Membro";
             const cInit = cName.slice(0, 2).toUpperCase();
             const isMine = c.user_id === userId;
             const cXp = c.author?.xp ?? 0;
             return (
-              <div key={c.id} className="flex gap-2.5 group/comment relative">
-                <div className="flex flex-col items-center shrink-0 relative">
-                  <Avatar initials={cInit} size="sm" xp={cXp} />
-                  {index !== comments.length - 1 && (
-                    <div className="absolute top-8 bottom-0 w-[1.5px] bg-white/5" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0 rounded-xl bg-white/[0.03] border border-white/[0.06] px-3 py-2">
+              <div key={c.id} className="flex gap-3 group/comment relative items-start">
+                <Avatar initials={cInit} size="sm" xp={cXp} avatarUrl={c.author?.avatar_url} />
+                
+                <div className="flex-1 min-w-0 rounded-2xl bg-white/[0.025] border border-white/[0.05] px-3.5 py-2.5 hover:bg-white/[0.04] hover:border-white/[0.08] transition-all duration-200 relative group/balloon shadow-sm">
+                  {/* Detalhes de Cabeçalho do Balão */}
                   <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-semibold text-foreground/90">{cName}</span>
+                      <span className="text-[11px] font-bold text-foreground/90">{cName}</span>
                       <LevelBadge xp={cXp} />
-                      <span className="text-[10px] text-muted-foreground/50">{formatTime(c.created_at)}</span>
+                      <span className="text-[9px] text-muted-foreground/50 font-medium">{formatTime(c.created_at)}</span>
                     </div>
                     {isMine && (
                       <button
-                        onClick={() => deleteComment.mutate(c.id)}
-                        className="opacity-0 group-hover/comment:opacity-100 text-muted-foreground hover:text-red-400 p-0.5 rounded transition"
+                        onClick={() => { if (confirm("Apagar comentário?")) deleteComment.mutate(c.id); }}
+                        className="opacity-0 group-hover/balloon:opacity-100 text-muted-foreground hover:text-red-400 p-0.5 rounded transition-all duration-200"
+                        title="Apagar comentário"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
-                  {c.content && <p className="text-xs text-muted-foreground/90 mt-1 leading-relaxed">{c.content}</p>}
+                  
+                  {/* Conteúdo do comentário */}
+                  {c.content && <p className="text-[11.5px] text-foreground/80 mt-1 leading-relaxed break-words">{c.content}</p>}
+                  
                   {c.image_url && (
-                    <div className="mt-2 rounded-lg overflow-hidden border border-white/[0.06] max-h-40">
-                      <img src={c.image_url} alt="" className="w-full max-h-40 object-cover" loading="lazy" />
+                    <div className="mt-2 rounded-lg overflow-hidden border border-white/[0.06] max-h-48 shadow-sm">
+                      <img src={c.image_url} alt="" className="w-full max-h-48 object-cover" loading="lazy" />
                     </div>
                   )}
                 </div>
@@ -653,34 +1128,44 @@ function CommentSection({ postId, postOwnerId, comments, userId }: { postId: str
       )}
 
       {/* Comment composer */}
-      <div className="px-5 py-3 border-t border-white/[0.06]">
+      <div className="px-5 py-3 border-t border-white/[0.04] pl-[62px]">
         {imgPreview && (
-          <div className="relative mb-2 ml-9 rounded-lg overflow-hidden border border-white/10 max-h-32 w-fit">
+          <div className="relative mb-2 ml-9 rounded-lg overflow-hidden border border-white/10 max-h-32 w-fit animate-fade-up">
             <img src={imgPreview} alt="Preview" className="max-h-32 object-cover" />
-            <button onClick={clearImg} className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/70 flex items-center justify-center">
+            <button onClick={clearImg} className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/70 flex items-center justify-center shadow-md">
               <X className="h-3 w-3" />
             </button>
           </div>
         )}
-        <div className="flex items-center gap-2">
+        
+        <div className="flex items-center gap-2.5">
           <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground/30 shrink-0" />
+          
           <input
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, 1000))}
             onKeyDown={handleKeyDown}
-            placeholder="Escreva um comentário..."
-            className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/40"
+            placeholder="Escreva um comentário (Pressione Enter para enviar)..."
+            className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl px-3.5 py-2.5 text-xs outline-none placeholder:text-muted-foreground/35 focus:border-primary/40 focus:bg-white/[0.04] focus:ring-1 focus:ring-primary/40 transition-all duration-200"
           />
+          
           <input ref={imgRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={handleImg} />
-          <button onClick={() => imgRef.current?.click()} className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition">
-            <ImageIcon className="h-3.5 w-3.5" />
+          
+          <button 
+            onClick={() => imgRef.current?.click()} 
+            className="p-2 rounded-xl text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
+            title="Adicionar imagem ao comentário"
+          >
+            <ImageIcon className="h-4 w-4" />
           </button>
+          
           <button
             onClick={() => addComment.mutate()}
             disabled={(!text.trim() && !imgFile) || addComment.isPending}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30 transition"
+            className="p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30 transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
+            title="Enviar comentário"
           >
-            <Send className="h-3.5 w-3.5" />
+            <Send className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -695,8 +1180,8 @@ function formatTime(iso: string) {
   const now = Date.now();
   const diff = (now - date.getTime()) / 1000;
   if (diff < 60) return "agora";
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d atrás`;
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }

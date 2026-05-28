@@ -191,10 +191,25 @@ export function NebulaPlayer({
   useEffect(() => {
     if (!settings.resume_playback) return;
     const v = videoRef.current;
-    if (!v || startedRef.current || !startAt || startAt < 3) return;
+    if (!v || startedRef.current) return;
+
+    let initialStart = startAt;
+    try {
+      const localKey = `nebula_resume_${src}`;
+      const savedLocal = localStorage.getItem(localKey);
+      if (savedLocal) {
+        const parsed = parseFloat(savedLocal);
+        if (!isNaN(parsed) && parsed > 0) {
+          initialStart = parsed;
+        }
+      }
+    } catch (_) {}
+
+    if (!initialStart || initialStart < 3) return;
+
     const onLoaded = () => {
       if (startedRef.current) return;
-      if (v.duration && startAt < v.duration - 5) v.currentTime = startAt;
+      if (v.duration && initialStart < v.duration - 5) v.currentTime = initialStart;
       startedRef.current = true;
     };
     v.addEventListener("loadedmetadata", onLoaded);
@@ -234,6 +249,11 @@ export function NebulaPlayer({
         onTimeUpdate={(e) => {
           const t = (e.target as HTMLVideoElement).currentTime;
           setCurrent(t);
+          if (settings.resume_playback) {
+            try {
+              localStorage.setItem(`nebula_resume_${src}`, String(t));
+            } catch (_) {}
+          }
           if (onProgress && Math.abs(t - lastReportRef.current) >= 5) {
             lastReportRef.current = t;
             onProgress(t, duration);

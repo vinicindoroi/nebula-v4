@@ -223,6 +223,8 @@ function OrganizerPage() {
       { id: "note-2", content: "Gravar vídeos de criativos na próxima sexta-feira à tarde", color: "blue", date: "2026-05-28" }
     ];
   });
+  const [showAllNotes, setShowAllNotes] = useState(false);
+  const displayedNotes = showAllNotes ? notes : notes.slice(0, 8);
 
   // Column creation modal state
   const [isColModalOpen, setIsColModalOpen] = useState(false);
@@ -274,7 +276,7 @@ function OrganizerPage() {
         } catch (_) {}
       }
     }
-    return DEFAULT_TRANSACTIONS;
+    return [];
   });
 
   const [finDesc, setFinDesc] = useState("");
@@ -288,6 +290,12 @@ function OrganizerPage() {
   const [roiRevenue, setRoiRevenue] = useState("");
   const [roiSales, setRoiSales] = useState("");
   const [roiTab, setRoiTab] = useState<"real" | "simulator">("real");
+
+  // Advanced dynamic traffic ROI states (Feature 7)
+  const [roiBudget, setRoiBudget] = useState("1000");
+  const [roiCpc, setRoiCpc] = useState("1.50");
+  const [roiConv, setRoiConv] = useState("2.0");
+  const [roiTicket, setRoiTicket] = useState("197");
 
   // Table search & filter states
   const [finSearchQuery, setFinSearchQuery] = useState("");
@@ -321,7 +329,7 @@ function OrganizerPage() {
       localStorage.setItem("nebula_kanban_categories", JSON.stringify(categories));
     }
     if (!localStorage.getItem("nebula_finances")) {
-      localStorage.setItem("nebula_finances", JSON.stringify(DEFAULT_TRANSACTIONS));
+      localStorage.setItem("nebula_finances", JSON.stringify([]));
     }
   }, []);
 
@@ -755,8 +763,8 @@ function OrganizerPage() {
   };
 
   const handleResetTransactions = () => {
-    syncTransactions(DEFAULT_TRANSACTIONS);
-    toast.success("Dados financeiros restaurados!");
+    syncTransactions([]);
+    toast.success("Todos os lançamentos financeiros foram removidos!");
   };
 
   // Real course/student progress statistics from database
@@ -1155,75 +1163,158 @@ function OrganizerPage() {
                       )}
                     </div>
                   ) : (
-                    <div className="space-y-3 animate-in fade-in duration-200">
-                      <div>
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Gasto em Ads (R$)</span>
+                    <div className="space-y-4 animate-in fade-in duration-200 text-xs">
+                      {/* Budget input with slider */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Orçamento de Tráfego:</span>
+                          <span className="font-extrabold text-foreground">R$ {parseFloat(roiBudget || "0").toLocaleString("pt-BR")}</span>
+                        </div>
                         <input
-                          type="number"
-                          placeholder="Ex: 500"
-                          value={roiAdSpend}
-                          onChange={(e) => setRoiAdSpend(e.target.value)}
-                          className="w-full glass rounded-lg px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/35 outline-none focus:border-primary/40 transition bg-background"
+                          type="range"
+                          min="100"
+                          max="20000"
+                          step="100"
+                          value={roiBudget}
+                          onChange={(e) => setRoiBudget(e.target.value)}
+                          className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                         />
                       </div>
 
-                      <div>
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Retorno de Vendas (R$)</span>
+                      {/* CPC input with slider */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">CPC Médio (Ads):</span>
+                          <span className="font-extrabold text-foreground">R$ {parseFloat(roiCpc || "0").toFixed(2)}</span>
+                        </div>
                         <input
-                          type="number"
-                          placeholder="Ex: 2500"
-                          value={roiRevenue}
-                          onChange={(e) => setRoiRevenue(e.target.value)}
-                          className="w-full glass rounded-lg px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/35 outline-none focus:border-primary/40 transition bg-background"
+                          type="range"
+                          min="0.10"
+                          max="5.00"
+                          step="0.05"
+                          value={roiCpc}
+                          onChange={(e) => setRoiCpc(e.target.value)}
+                          className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                         />
                       </div>
 
-                      <div>
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Vendas (Opcional)</span>
+                      {/* Conv% input with slider */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Taxa de Conversão:</span>
+                          <span className="font-extrabold text-foreground">{parseFloat(roiConv || "0").toFixed(1)}%</span>
+                        </div>
                         <input
-                          type="number"
-                          placeholder="Ex: 10"
-                          value={roiSales}
-                          onChange={(e) => setRoiSales(e.target.value)}
-                          className="w-full glass rounded-lg px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/35 outline-none focus:border-primary/40 transition bg-background"
+                          type="range"
+                          min="0.1"
+                          max="10.0"
+                          step="0.1"
+                          value={roiConv}
+                          onChange={(e) => setRoiConv(e.target.value)}
+                          className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                      </div>
+
+                      {/* Product Ticket input with slider */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Ticket do Produto:</span>
+                          <span className="font-extrabold text-foreground">R$ {parseFloat(roiTicket || "0").toLocaleString("pt-BR")}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="10"
+                          max="1997"
+                          step="10"
+                          value={roiTicket}
+                          onChange={(e) => setRoiTicket(e.target.value)}
+                          className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                         />
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Calculados do Simulador */}
-                {roiTab === "simulator" && parseFloat(roiAdSpend) > 0 && parseFloat(roiRevenue) > 0 && (() => {
-                  const spend = parseFloat(roiAdSpend);
-                  const rev = parseFloat(roiRevenue);
-                  const sales = parseFloat(roiSales);
-                  const roiPercent = Math.round(((rev - spend) / spend) * 100);
-                  const roiMultiplier = (rev / spend).toFixed(2);
-                  const cpa = sales > 0 ? (spend / sales).toFixed(2) : null;
-                  const isProfitable = roiPercent >= 0;
+                {/* Calculados Avançados do Simulador (Feature 7) */}
+                {roiTab === "simulator" && (() => {
+                  const spend = parseFloat(roiBudget) || 0;
+                  const cpc = parseFloat(roiCpc) || 1.5;
+                  const convRate = (parseFloat(roiConv) || 2.0) / 100;
+                  const ticket = parseFloat(roiTicket) || 197;
+
+                  const estimatedClicks = cpc > 0 ? Math.round(spend / cpc) : 0;
+                  const estimatedSales = Math.round(estimatedClicks * convRate);
+                  const expectedRevenue = estimatedSales * ticket;
+                  const expectedProfit = expectedRevenue - spend;
+                  const roiPercent = spend > 0 ? Math.round((expectedProfit / spend) * 100) : 0;
+                  const roiMultiplier = spend > 0 ? (expectedRevenue / spend).toFixed(2) : "0.00";
+                  const cpa = estimatedSales > 0 ? (spend / estimatedSales).toFixed(2) : "0.00";
+
+                  // Semaphore configurations
+                  let statusColor = "from-red-500/20 to-red-500/5 border-red-500/30 text-red-400";
+                  let statusTitle = "Operação com Risco Alto ⚠️";
+                  let statusDesc = "Campanha no vermelho. Otimize a copy da página e reduza o CPC para sair do prejuízo.";
+                  let statusGlow = "shadow-[0_0_15px_rgba(239,68,68,0.1)]";
+
+                  if (roiPercent >= 150) {
+                    statusColor = "from-emerald-500/20 to-emerald-500/5 border-emerald-500/30 text-emerald-400";
+                    statusTitle = "Campanha Super Lucrativa! 🚀";
+                    statusDesc = "Excelente ROI! O funil está validado e pronto para escala vertical acelerada.";
+                    statusGlow = "shadow-[0_0_15px_rgba(16,185,129,0.15)]";
+                  } else if (roiPercent >= 0) {
+                    statusColor = "from-amber-500/20 to-amber-500/5 border-amber-500/30 text-amber-400";
+                    statusTitle = "Lucro Moderado / Break-Even ⚖️";
+                    statusDesc = "Operação sustentável, mas sob margens estreitas. Melhore a CTR para melhorar os custos.";
+                    statusGlow = "shadow-[0_0_15px_rgba(245,158,11,0.1)]";
+                  }
 
                   return (
-                    <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded-xl mt-4 space-y-2.5 animate-in fade-in duration-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Retorno (ROI):</span>
-                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${isProfitable ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400 animate-pulse"}`}>
+                    <div className="space-y-3.5 mt-4 pt-3.5 border-t border-white/[0.04] animate-in fade-in duration-200">
+                      {/* Breakdown grid */}
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="bg-white/[0.01] border border-white/[0.03] p-2.5 rounded-xl">
+                          <span className="text-muted-foreground/60 block">Cliques Previstos</span>
+                          <span className="font-extrabold text-foreground text-xs">{estimatedClicks.toLocaleString()}</span>
+                        </div>
+                        <div className="bg-white/[0.01] border border-white/[0.03] p-2.5 rounded-xl">
+                          <span className="text-muted-foreground/60 block">Vendas Previstas</span>
+                          <span className="font-extrabold text-foreground text-xs">{estimatedSales.toLocaleString()}</span>
+                        </div>
+                        <div className="bg-white/[0.01] border border-white/[0.03] p-2.5 rounded-xl">
+                          <span className="text-muted-foreground/60 block">CPA Estimado</span>
+                          <span className="font-extrabold text-cyan-400 text-xs">R$ {parseFloat(cpa).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="bg-white/[0.01] border border-white/[0.03] p-2.5 rounded-xl">
+                          <span className="text-muted-foreground/60 block">Faturamento Previsto</span>
+                          <span className="font-extrabold text-emerald-400 text-xs">R$ {expectedRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+
+                      {/* ROI Summary bar */}
+                      <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded-xl flex justify-between items-center text-xs">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">ROI da Operação:</span>
+                        <span className={`font-black px-2 py-0.5 rounded-full ${roiPercent >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
                           {roiPercent}% ({roiMultiplier}x)
                         </span>
                       </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Resultado:</span>
-                        <span className={`font-extrabold ${isProfitable ? "text-emerald-400" : "text-red-400"}`}>
-                          R$ {(rev - spend).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+
+                      {/* Profit/Loss details */}
+                      <div className="flex justify-between items-center text-xs px-1">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Lucro Líquido Estimado:</span>
+                        <span className={`font-extrabold text-sm ${expectedProfit >= 0 ? "text-cyan-400" : "text-red-400"}`}>
+                          R$ {expectedProfit.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                         </span>
                       </div>
-                      {cpa && (
-                        <div className="flex justify-between items-center text-xs pt-1.5 border-t border-white/[0.03]">
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">CPA Estimado:</span>
-                          <span className="font-extrabold text-cyan-400">
-                            R$ {parseFloat(cpa).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                          </span>
+
+                      {/* Semáforo de Risco Operacional Widget */}
+                      <div className={`rounded-xl border p-3 bg-gradient-to-br ${statusColor} ${statusGlow} flex flex-col gap-1`}>
+                        <div className="font-black text-xs uppercase tracking-wider flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-current animate-pulse" /> {statusTitle}
                         </div>
-                      )}
+                        <p className="text-[9px] text-muted-foreground/80 leading-relaxed font-semibold">
+                          {statusDesc}
+                        </p>
+                      </div>
                     </div>
                   );
                 })()}
@@ -1293,9 +1384,9 @@ function OrganizerPage() {
                   <button
                     onClick={handleResetTransactions}
                     className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-muted-foreground hover:text-foreground text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
-                    title="Restaurar dados padrão"
+                    title="Remover todas as transações"
                   >
-                    <Zap className="h-3.5 w-3.5 text-orange-400" /> Restaurar Padrão
+                    <Trash2 className="h-3.5 w-3.5 text-rose-400" /> Limpar Histórico
                   </button>
                 </div>
               </div>
@@ -1652,7 +1743,7 @@ function OrganizerPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {notes.map((note) => {
+          {displayedNotes.map((note) => {
             const colorClasses = {
               purple: "from-primary/[0.08] to-primary/[0.01] border-primary/20 hover:border-primary/40 focus-within:border-primary/50 shadow-[0_4px_20px_rgba(147,51,234,0.02)]",
               blue: "from-blue-500/[0.08] to-blue-500/[0.01] border-blue-500/20 hover:border-blue-500/40 focus-within:border-blue-500/50 shadow-[0_4px_20px_rgba(59,130,246,0.02)]",
@@ -1710,6 +1801,17 @@ function OrganizerPage() {
             </div>
           )}
         </div>
+
+        {notes.length > 8 && (
+          <div className="pt-2 flex justify-center animate-fade-up">
+            <button
+              onClick={() => setShowAllNotes(!showAllNotes)}
+              className="px-5 py-2 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-primary/30 text-xs font-bold text-foreground transition-all duration-300 hover:scale-102 cursor-pointer shadow-md"
+            >
+              {showAllNotes ? "Recolher mural de insights ▴" : `Ver todos os insights (${notes.length}) ▾`}
+            </button>
+          </div>
+        )}
       </section>
 
       {/* --- UNIFIED POPUP MODAL: MANAGE & CREATE COLUMNS --- */}
@@ -2471,14 +2573,14 @@ function KanbanCard({ task, columnColor, onMove, onDelete, onDragStart, onDragEn
             )}
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-              className="p-1.5 hover:bg-white/5 border border-transparent hover:border-white/10 rounded-lg text-muted-foreground/40 hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer shrink-0"
+              className="p-1.5 hover:bg-white/5 border border-transparent hover:border-white/10 rounded-lg text-muted-foreground/40 hover:text-foreground md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 cursor-pointer shrink-0"
               title="Editar tarefa"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-              className="p-1.5 hover:bg-destructive/10 border border-transparent hover:border-destructive/20 rounded-lg text-muted-foreground/40 hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer shrink-0"
+              className="p-1.5 hover:bg-destructive/10 border border-transparent hover:border-destructive/20 rounded-lg text-muted-foreground/40 hover:text-destructive-foreground md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 cursor-pointer shrink-0"
               title="Excluir tarefa"
             >
               <Trash2 className="h-3.5 w-3.5" />

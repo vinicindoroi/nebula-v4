@@ -32,6 +32,7 @@ const navGroups: NavGroup[] = [
     label: "Comercial",
     items: [
       { to: "/admin/members", label: "Membros", icon: Users },
+      { to: "/admin/forms", label: "Respostas Forms", icon: ScrollText },
       { to: "/admin/offers", label: "Ofertas", icon: Crown },
       { to: "/admin/plans", label: "Planos", icon: Package },
       { to: "/admin/sales", label: "Vendas", icon: CreditCard },
@@ -162,7 +163,10 @@ export function AdminShell() {
             <div className="relative group">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <input
+                type="search"
                 placeholder="Buscar... (Cmd+K)"
+                autoComplete="off"
+                data-lpignore="true"
                 className="w-full bg-white/[0.03] border border-white/10 rounded-full pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white/[0.05] transition"
               />
             </div>

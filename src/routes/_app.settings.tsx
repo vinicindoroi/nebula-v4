@@ -55,8 +55,35 @@ function SettingsPage() {
     } catch {}
   }, []);
 
-  const togglePref = (key: keyof Prefs) => {
-    const next = { ...prefs, [key]: !prefs[key] };
+  const togglePref = async (key: keyof Prefs) => {
+    const nextVal = !prefs[key];
+
+    if (key === "pushAll" && nextVal) {
+      if (typeof window !== "undefined" && "Notification" in window) {
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            new Notification("Nebula Member Hub 🚀", {
+              body: "Notificações push ativadas com sucesso! Você receberá atualizações importantes aqui.",
+              icon: "/nebula_logo.png"
+            });
+            toast.success("Notificações Push ativadas com sucesso!");
+          } else if (permission === "denied") {
+            toast.error("Permissão de notificações negada pelo navegador.");
+            return; // don't enable if denied
+          } else {
+            return; // cancelled/dismissed
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        toast.error("Notificações não são suportadas neste navegador.");
+        return;
+      }
+    }
+
+    const next = { ...prefs, [key]: nextVal };
     setPrefs(next);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   };
@@ -88,8 +115,8 @@ function SettingsPage() {
       </header>
 
       <div className="flex gap-6 flex-col lg:flex-row">
-        <aside className="lg:w-56 shrink-0">
-          <nav className="rounded-2xl border border-white/5 bg-white/[0.02] p-2 space-y-0.5">
+        <aside className="lg:w-56 shrink-0 w-full">
+          <nav className="rounded-2xl border border-white/5 bg-white/[0.02] p-1.5 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible no-scrollbar">
             {TABS.map((t) => {
               const Icon = t.icon;
               const active = tab === t.id;
@@ -97,9 +124,9 @@ function SettingsPage() {
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm transition shrink-0 whitespace-nowrap lg:w-full ${
                     active
-                      ? "bg-gradient-to-r from-primary/15 via-primary/5 to-transparent text-foreground"
+                      ? "bg-gradient-to-r from-primary/15 via-primary/5 to-transparent text-foreground border border-primary/10 lg:border-transparent"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   }`}
                 >
