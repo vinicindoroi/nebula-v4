@@ -1637,11 +1637,9 @@ function OrganizerPage() {
           </div>
         ) : (
           <div 
-            className="grid grid-cols-1 md:grid-flow-col md:grid-cols-none gap-4 stagger-enter overflow-x-auto pb-4 pr-1 select-none"
+            className="flex flex-row md:grid md:grid-flow-col gap-4 overflow-x-auto pb-4 pr-1 select-none w-full stagger-enter no-scrollbar"
             style={{
-              gridTemplateColumns: columns.length <= 3 
-                ? `repeat(${columns.length}, minmax(0, 1fr))` 
-                : `repeat(${columns.length}, minmax(290px, 1fr))`
+              gridTemplateColumns: `repeat(${columns.length}, minmax(290px, 1fr))`
             }}
           >
             {columns.map((col) => {
@@ -1663,7 +1661,7 @@ function OrganizerPage() {
                   onDragOver={(e) => handleDragOver(e, col.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, col.id)}
-                  className={`rounded-2xl border transition-all duration-300 p-3 min-h-[480px] flex flex-col gap-3 relative overflow-hidden ${
+                  className={`w-[290px] sm:w-[320px] md:w-auto shrink-0 rounded-2xl border transition-all duration-300 p-3 min-h-[480px] flex flex-col gap-3 relative overflow-hidden ${
                     activeDragCol === col.id 
                       ? colColors.activeBorder + " scale-[1.01]" 
                       : isDragging 
