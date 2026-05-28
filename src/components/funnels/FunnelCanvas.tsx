@@ -15,7 +15,6 @@ import {
   ReactFlowInstance,
   ConnectionMode,
   SelectionMode,
-  useViewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { toPng, toSvg } from 'html-to-image';
@@ -68,7 +67,12 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
   const copiedNodesRef = useRef<Node[]>([]);
 
   // --- FREEHAND DRAWING STATES (MIRO STYLE) ---
-  const { x, y, zoom } = useViewport();
+  const [viewport, setViewport] = useState<Viewport>(() => funnel.viewport || { x: 0, y: 0, zoom: 1 });
+  
+  const onViewportMove = useCallback((event: any, viewportData: Viewport) => {
+    setViewport(viewportData);
+  }, []);
+
   interface DrawPath {
     id: string;
     points: { x: number; y: number }[];
@@ -163,7 +167,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
   };
 
   const eraseAt = (point: { x: number; y: number }) => {
-    const ERASE_THRESHOLD = 20 / zoom; // Adjust eraser size based on zoom level
+    const ERASE_THRESHOLD = 20 / viewport.zoom; // Adjust eraser size based on zoom level
     const updatedDrawings = drawings.filter((path) => {
       return !path.points.some((p) => {
         const dist = Math.hypot(p.x - point.x, p.y - point.y);
@@ -220,6 +224,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
       setNodes(nextNodes);
       setEdges(nextEdges);
       setTrackingToken(funnel.tracking_token || null);
+      setViewport(nextViewport as unknown as Viewport);
 
       // Seed autosave snapshot to avoid re-saving immediately on mount/refetch
       lastSavedSnapshotRef.current = JSON.stringify({ nodes: nextNodes, edges: nextEdges, viewport: nextViewport });
@@ -1388,6 +1393,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
               onNodeDragStart={onNodeDragStart}
               onNodeDrag={onNodeDrag}
               onNodeDragStop={onNodeDragStop}
+              onMove={onViewportMove}
               onMoveEnd={onMoveEnd}
               onInit={(instance) => setReactFlowInstance(instance as ReactFlowInstance<Node, Edge>)}
               onDrop={onDrop}
@@ -1435,7 +1441,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
             >
-              <g transform={`translate(${x}, ${y}) scale(${zoom})`}>
+              <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
                 {/* Render finalized drawing paths */}
                 {drawings.map((path) => (
                   <path
