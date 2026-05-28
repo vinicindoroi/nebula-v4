@@ -123,6 +123,28 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // If in placement mode, spawn node at click coordinates
+    if (interactionMode === 'sticky-note' || interactionMode === 'free-text') {
+      if (e.button !== 0) return;
+      
+      const target = e.target as HTMLElement;
+      if (
+        target.closest('.react-flow__controls') ||
+        target.closest('button') ||
+        target.closest('input')
+      ) {
+        return;
+      }
+      
+      e.preventDefault();
+      const coords = getFlowCoords(e as any);
+      if (!coords) return;
+      
+      spawnNodeAt(interactionMode, coords);
+      setInteractionMode('select');
+      return;
+    }
+
     if (interactionMode !== 'draw') return;
     
     // Only left click draws
@@ -205,16 +227,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
   };
 
-  const spawnNode = (type: 'sticky-note' | 'free-text') => {
-    if (!reactFlowInstance || !reactFlowWrapper.current) return;
-    const rect = reactFlowWrapper.current.getBoundingClientRect();
-    const centerScreenX = rect.left + rect.width / 2;
-    const centerScreenY = rect.top + rect.height / 2;
-    const position = reactFlowInstance.screenToFlowPosition({
-      x: centerScreenX,
-      y: centerScreenY,
-    });
-
+  const spawnNodeAt = (type: 'sticky-note' | 'free-text', position: { x: number; y: number }) => {
     const nodeType = type === 'free-text' ? 'free-text' : 'funnel';
     const label = type === 'free-text' ? 'Texto Livre' : 'Nota Livre';
 
@@ -230,7 +243,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     };
 
     setNodes((nds) => nds.concat(newNode));
-    toast.success(`${label} adicionado ao canvas!`);
+    toast.success(`${label} criado no local clicado!`);
   };
 
   // Multi-connection: Shift+Click to select sources, then click target to connect all
@@ -567,7 +580,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
   // Shift+Click on nodes to mark them as sources, then click (without shift) on target to connect all
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
-      if (interactionMode === 'draw') return;
+      if (interactionMode === 'draw' || interactionMode === 'sticky-note' || interactionMode === 'free-text') return;
       if (event.shiftKey) {
         // Shift+Click: toggle this node as a multi-connect source
         event.stopPropagation();
@@ -940,7 +953,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
   );
 
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
-    if (interactionMode === 'draw') return;
+    if (interactionMode === 'draw' || interactionMode === 'sticky-note' || interactionMode === 'free-text') return;
     const nodeData = node.data as FunnelNodeData;
     if (nodeData.type === 'free-text') {
       // Dispatch custom event to notify FreeTextNode to enter edit mode
@@ -1149,6 +1162,16 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
         setInteractionMode('draw');
       }
 
+      // N - Sticky Note mode
+      if (event.key === 'n' || event.key === 'N') {
+        setInteractionMode('sticky-note');
+      }
+
+      // T - Free Text mode
+      if (event.key === 't' || event.key === 'T') {
+        setInteractionMode('free-text');
+      }
+
       // Ctrl+Z / Cmd+Z - Undo
       if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
         event.preventDefault();
@@ -1331,6 +1354,8 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     }
   };
 
+  const isRestrictedMode = interactionMode === 'draw' || interactionMode === 'sticky-note' || interactionMode === 'free-text';
+
   return (
     <div className="flex h-full">
       <FunnelElementsSidebar collapsed={sidebarCollapsed} />
@@ -1368,8 +1393,8 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
           onEducationalModeChange={setEducationalMode}
           onOpenTracking={() => setTrackingDialogOpen(true)}
           hasTrackingToken={!!trackingToken}
-          onAddStickyNote={() => spawnNode('sticky-note')}
-          onAddFreeText={() => spawnNode('free-text')}
+          onAddStickyNote={() => setInteractionMode(interactionMode === 'sticky-note' ? 'select' : 'sticky-note')}
+          onAddFreeText={() => setInteractionMode(interactionMode === 'free-text' ? 'select' : 'free-text')}
         />
 
         {/* Draw Mode sub-toolbar with Miro-style colors and tools */}
@@ -1506,9 +1531,9 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
-              onConnect={interactionMode === 'draw' ? undefined : onConnect}
+              onConnect={isRestrictedMode ? undefined : onConnect}
               onReconnectStart={onReconnectStart}
-              onReconnect={interactionMode === 'draw' ? undefined : onReconnect}
+              onReconnect={isRestrictedMode ? undefined : onReconnect}
               onReconnectEnd={onReconnectEnd}
               onNodeDragStart={onNodeDragStart}
               onNodeDrag={onNodeDrag}
@@ -1529,11 +1554,11 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
               zoomOnScroll
               selectionOnDrag={interactionMode === 'select'}
               selectionMode={SelectionMode.Partial}
-              nodesDraggable={interactionMode !== 'draw'}
-              nodesFocusable={interactionMode !== 'draw'}
-              edgesReconnectable={interactionMode !== 'draw'}
-              edgesFocusable={interactionMode !== 'draw'}
-              elementsSelectable={interactionMode !== 'draw'}
+              nodesDraggable={!isRestrictedMode}
+              nodesFocusable={!isRestrictedMode}
+              edgesReconnectable={!isRestrictedMode}
+              edgesFocusable={!isRestrictedMode}
+              elementsSelectable={!isRestrictedMode}
               deleteKeyCode={['Delete', 'Backspace']}
               snapToGrid
               snapGrid={[20, 20]}

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
-export type InteractionMode = 'select' | 'pan' | 'draw';
+export type InteractionMode = 'select' | 'pan' | 'draw' | 'sticky-note' | 'free-text';
 
 interface FunnelFloatingToolbarProps {
   onExport: (format: 'png' | 'svg') => void;
@@ -118,8 +118,13 @@ export function FunnelFloatingToolbar({
                 variant="ghost"
                 size="sm"
                 onClick={onAddStickyNote}
-                className="h-7 w-7 p-0 rounded-full hover:bg-white/[0.06] text-muted-foreground hover:text-foreground transition-all"
-                title="Nota Livre (Adicionar)"
+                className={cn(
+                  "h-7 w-7 p-0 rounded-full transition-all",
+                  interactionMode === 'sticky-note'
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/30"
+                    : "hover:bg-white/[0.06] text-muted-foreground"
+                )}
+                title="Nota Livre (N)"
               >
                 <StickyNote className="w-3.5 h-3.5" />
               </Button>
@@ -129,8 +134,13 @@ export function FunnelFloatingToolbar({
                 variant="ghost"
                 size="sm"
                 onClick={onAddFreeText}
-                className="h-7 w-7 p-0 rounded-full hover:bg-white/[0.06] text-muted-foreground hover:text-foreground transition-all"
-                title="Texto Livre (Adicionar)"
+                className={cn(
+                  "h-7 w-7 p-0 rounded-full transition-all",
+                  interactionMode === 'free-text'
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/30"
+                    : "hover:bg-white/[0.06] text-muted-foreground"
+                )}
+                title="Texto Livre (T)"
               >
                 <Type className="w-3.5 h-3.5" />
               </Button>
