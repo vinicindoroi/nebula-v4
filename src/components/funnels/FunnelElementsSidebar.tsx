@@ -290,13 +290,6 @@ export function FunnelElementsSidebar({ collapsed }: FunnelElementsSidebarProps)
           />
           
           <Section 
-            title="Anotações" 
-            elements={funnelElements.notes} 
-            onDragStart={onDragStart}
-            defaultOpen={false}
-          />
-
-          <Section 
             title="Conectores" 
             elements={funnelElements.connectors || []} 
             onDragStart={onDragStart}

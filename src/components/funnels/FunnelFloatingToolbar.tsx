@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Download, Radio, Hand, MousePointer2, Check, Loader2, Group, GraduationCap, Upload, Ungroup, Code, Pencil } from 'lucide-react';
+import { Download, Radio, Hand, MousePointer2, Check, Loader2, Group, GraduationCap, Upload, Ungroup, Code, Pencil, StickyNote, Type } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,8 @@ interface FunnelFloatingToolbarProps {
   onEducationalModeChange?: (enabled: boolean) => void;
   onOpenTracking?: () => void;
   hasTrackingToken?: boolean;
+  onAddStickyNote?: () => void;
+  onAddFreeText?: () => void;
 }
 
 export function FunnelFloatingToolbar({
@@ -47,6 +49,8 @@ export function FunnelFloatingToolbar({
   onEducationalModeChange,
   onOpenTracking,
   hasTrackingToken = false,
+  onAddStickyNote,
+  onAddFreeText,
 }: FunnelFloatingToolbarProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -103,6 +107,37 @@ export function FunnelFloatingToolbar({
           <Pencil className="w-3.5 h-3.5" />
         </Button>
       </div>
+
+      {/* Annotations Tools next to Freehand Drawing */}
+      {(onAddStickyNote || onAddFreeText) && (
+        <>
+          <div className="w-px h-5 bg-white/10" />
+          <div className="flex items-center bg-white/[0.04] rounded-full p-0.5 border border-white/5">
+            {onAddStickyNote && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onAddStickyNote}
+                className="h-7 w-7 p-0 rounded-full hover:bg-white/[0.06] text-muted-foreground hover:text-foreground transition-all"
+                title="Nota Livre (Adicionar)"
+              >
+                <StickyNote className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            {onAddFreeText && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onAddFreeText}
+                className="h-7 w-7 p-0 rounded-full hover:bg-white/[0.06] text-muted-foreground hover:text-foreground transition-all"
+                title="Texto Livre (Adicionar)"
+              >
+                <Type className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Group Button - only show when multiple nodes selected */}
       {selectedNodesCount >= 2 && onGroupNodes && (

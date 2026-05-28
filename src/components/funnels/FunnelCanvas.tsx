@@ -207,6 +207,34 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
   };
 
+  const spawnNode = (type: 'sticky-note' | 'free-text') => {
+    if (!reactFlowInstance || !reactFlowWrapper.current) return;
+    const rect = reactFlowWrapper.current.getBoundingClientRect();
+    const centerScreenX = rect.left + rect.width / 2;
+    const centerScreenY = rect.top + rect.height / 2;
+    const position = reactFlowInstance.screenToFlowPosition({
+      x: centerScreenX,
+      y: centerScreenY,
+    });
+
+    const nodeType = type === 'free-text' ? 'free-text' : 'funnel';
+    const label = type === 'free-text' ? 'Texto Livre' : 'Nota Livre';
+
+    const newNode: Node = {
+      id: `${type}-${Date.now()}`,
+      type: nodeType,
+      position,
+      data: {
+        label,
+        type,
+        ...(type === 'sticky-note' ? { content: 'Nota...', backgroundColor: '#FCD34D' } : { content: 'Texto...' }),
+      } as FunnelNodeData,
+    };
+
+    setNodes((nds) => nds.concat(newNode));
+    toast.success(`${label} adicionado ao canvas!`);
+  };
+
   // Multi-connection: Shift+Click to select sources, then click target to connect all
   const [multiConnectSources, setMultiConnectSources] = useState<string[]>([]);
   const multiConnectModeRef = useRef(false);
@@ -245,6 +273,10 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
 
       // Seed autosave snapshot to avoid re-saving immediately on mount/refetch
       lastSavedSnapshotRef.current = JSON.stringify({ nodes: nextNodes, edges: nextEdges, viewport: nextViewport });
+
+      // Clear the history stack when switching funnels
+      historyRef.current = [];
+      historyIndexRef.current = -1;
     }
   }, [funnel.id, funnel.tracking_token, setNodes, setEdges]);
 
@@ -968,10 +1000,45 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     toast.success(`${newNodes.length} bloco(s) colado(s)`);
   }, [setNodes]);
 
-  // Undo/Redo history
-  const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
+  // --- UNDO/REDO HISTORY ---
+  interface HistoryEntry {
+    nodes: Node[];
+    edges: Edge[];
+    drawings: DrawPath[];
+  }
+
+  const historyRef = useRef<HistoryEntry[]>([]);
   const historyIndexRef = useRef(-1);
   const isUndoRedoRef = useRef(false);
+
+  // Deep clone state and cleanse live/analytics properties from history to avoid loops
+  const serializeState = useCallback((nodesList: Node[], edgesList: Edge[], drawingsList: DrawPath[]) => {
+    const cleanNodes = nodesList.map(node => {
+      const nodeCopy = JSON.parse(JSON.stringify(node));
+      if (nodeCopy.data) {
+        delete nodeCopy.data.analyticsPageviews;
+        delete nodeCopy.data.analyticsVisitors;
+        delete nodeCopy.data.analyticsIsLive;
+        delete nodeCopy.data.analyticsEnabled;
+      }
+      return nodeCopy;
+    });
+
+    const cleanEdges = edgesList.map(edge => {
+      const edgeCopy = JSON.parse(JSON.stringify(edge));
+      if (edgeCopy.data) {
+        delete edgeCopy.data.analyticsConversion;
+        delete edgeCopy.data.analyticsEnabled;
+      }
+      return edgeCopy;
+    });
+
+    return {
+      nodes: cleanNodes,
+      edges: cleanEdges,
+      drawings: JSON.parse(JSON.stringify(drawingsList)),
+    };
+  }, []);
 
   // Save to history
   const saveToHistory = useCallback(() => {
@@ -979,41 +1046,70 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
       isUndoRedoRef.current = false;
       return;
     }
-    const newEntry = { nodes: [...nodes], edges: [...edges] };
+
+    const newEntry = serializeState(nodes, edges, drawings);
+
+    // Prevent duplicate consecutive entries in history
+    if (historyRef.current.length > 0 && historyIndexRef.current >= 0) {
+      const lastEntry = historyRef.current[historyIndexRef.current];
+      if (
+        JSON.stringify(lastEntry.nodes) === JSON.stringify(newEntry.nodes) &&
+        JSON.stringify(lastEntry.edges) === JSON.stringify(newEntry.edges) &&
+        JSON.stringify(lastEntry.drawings) === JSON.stringify(newEntry.drawings)
+      ) {
+        return;
+      }
+    }
+
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
     historyRef.current.push(newEntry);
     historyIndexRef.current = historyRef.current.length - 1;
-    // Limit history to 50 entries
+
+    // Limit history size
     if (historyRef.current.length > 50) {
       historyRef.current.shift();
       historyIndexRef.current--;
     }
-  }, [nodes, edges]);
+  }, [nodes, edges, drawings, serializeState]);
 
   useEffect(() => {
-    const timeout = setTimeout(saveToHistory, 500);
+    const timeout = setTimeout(saveToHistory, 400);
     return () => clearTimeout(timeout);
-  }, [nodes, edges, saveToHistory]);
+  }, [nodes, edges, drawings, saveToHistory]);
 
   const handleUndo = useCallback(() => {
     if (historyIndexRef.current > 0) {
-      historyIndexRef.current--;
       isUndoRedoRef.current = true;
+      historyIndexRef.current--;
       const entry = historyRef.current[historyIndexRef.current];
-      setNodes(entry.nodes);
-      setEdges(entry.edges);
+
+      setNodes(JSON.parse(JSON.stringify(entry.nodes)));
+      setEdges(JSON.parse(JSON.stringify(entry.edges)));
+      setDrawings(JSON.parse(JSON.stringify(entry.drawings)));
+      localStorage.setItem(`nebula_funnel_drawings_${funnel.id}`, JSON.stringify(entry.drawings));
+      
+      toast.success("Desfeito!");
+    } else {
+      toast.error("Nada para desfazer");
     }
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, funnel.id]);
 
   const handleRedo = useCallback(() => {
     if (historyIndexRef.current < historyRef.current.length - 1) {
-      historyIndexRef.current++;
       isUndoRedoRef.current = true;
+      historyIndexRef.current++;
       const entry = historyRef.current[historyIndexRef.current];
-      setNodes(entry.nodes);
-      setEdges(entry.edges);
+
+      setNodes(JSON.parse(JSON.stringify(entry.nodes)));
+      setEdges(JSON.parse(JSON.stringify(entry.edges)));
+      setDrawings(JSON.parse(JSON.stringify(entry.drawings)));
+      localStorage.setItem(`nebula_funnel_drawings_${funnel.id}`, JSON.stringify(entry.drawings));
+
+      toast.success("Refeito!");
+    } else {
+      toast.error("Nada para refazer");
     }
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, funnel.id]);
 
   // Listen for delete-line-anchors events from edge deletion
   useEffect(() => {
@@ -1273,6 +1369,8 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
           onEducationalModeChange={setEducationalMode}
           onOpenTracking={() => setTrackingDialogOpen(true)}
           hasTrackingToken={!!trackingToken}
+          onAddStickyNote={() => spawnNode('sticky-note')}
+          onAddFreeText={() => spawnNode('free-text')}
         />
 
         {/* Draw Mode sub-toolbar with Miro-style colors and tools */}
