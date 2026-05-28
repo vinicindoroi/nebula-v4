@@ -128,11 +128,9 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     // Only left click draws
     if (e.button !== 0) return;
     
-    // Don't draw if clicking on nodes, edges, or overlays
+    // Don't draw if clicking on React Flow controls or control buttons
     const target = e.target as HTMLElement;
     if (
-      target.closest('.react-flow__node') || 
-      target.closest('.react-flow__edge') || 
       target.closest('.react-flow__controls') ||
       target.closest('button') ||
       target.closest('input')
@@ -569,6 +567,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
   // Shift+Click on nodes to mark them as sources, then click (without shift) on target to connect all
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
+      if (interactionMode === 'draw') return;
       if (event.shiftKey) {
         // Shift+Click: toggle this node as a multi-connect source
         event.stopPropagation();
@@ -940,8 +939,8 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     [reactFlowInstance, setNodes, setEdges]
   );
 
-  // Double-click to open config (skip for free-text nodes)
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (interactionMode === 'draw') return;
     const nodeData = node.data as FunnelNodeData;
     if (nodeData.type === 'free-text') {
       // Dispatch custom event to notify FreeTextNode to enter edit mode
@@ -1507,9 +1506,9 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
+              onConnect={interactionMode === 'draw' ? undefined : onConnect}
               onReconnectStart={onReconnectStart}
-              onReconnect={onReconnect}
+              onReconnect={interactionMode === 'draw' ? undefined : onReconnect}
               onReconnectEnd={onReconnectEnd}
               onNodeDragStart={onNodeDragStart}
               onNodeDrag={onNodeDrag}
@@ -1530,9 +1529,11 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
               zoomOnScroll
               selectionOnDrag={interactionMode === 'select'}
               selectionMode={SelectionMode.Partial}
-              edgesReconnectable
-              edgesFocusable
-              elementsSelectable
+              nodesDraggable={interactionMode !== 'draw'}
+              nodesFocusable={interactionMode !== 'draw'}
+              edgesReconnectable={interactionMode !== 'draw'}
+              edgesFocusable={interactionMode !== 'draw'}
+              elementsSelectable={interactionMode !== 'draw'}
               deleteKeyCode={['Delete', 'Backspace']}
               snapToGrid
               snapGrid={[20, 20]}
