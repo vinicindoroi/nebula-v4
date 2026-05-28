@@ -230,6 +230,7 @@ export type Database = {
           name: string
           logo_url: string
           primary_color: string
+          restrict_to_leads: boolean
           updated_at: string
         }
         Insert: {
@@ -237,6 +238,7 @@ export type Database = {
           name?: string
           logo_url?: string
           primary_color?: string
+          restrict_to_leads?: boolean
           updated_at?: string
         }
         Update: {
@@ -244,6 +246,7 @@ export type Database = {
           name?: string
           logo_url?: string
           primary_color?: string
+          restrict_to_leads?: boolean
           updated_at?: string
         }
         Relationships: []

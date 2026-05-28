@@ -10,7 +10,7 @@ export const Route = createFileRoute("/admin/settings")({ component: Page });
 const STORAGE_KEY = "admin_settings_v1";
 
 type SettingsShape = {
-  general: { name: string; logoUrl: string; primaryColor: string };
+  general: { name: string; logoUrl: string; primaryColor: string; restrictToLeads: boolean };
   payments: { gateway: string; publicKey: string };
   email: { smtpHost: string; sender: string };
   integrations: { apiKey: string; webhookUrl: string };
@@ -19,7 +19,7 @@ type SettingsShape = {
 };
 
 const DEFAULTS: SettingsShape = {
-  general: { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6" },
+  general: { name: "Membros", logoUrl: "/nebula_logo.png", primaryColor: "#8b5cf6", restrictToLeads: false },
   payments: { gateway: "stripe", publicKey: "" },
   email: { smtpHost: "", sender: "" },
   integrations: { apiKey: "", webhookUrl: "" },
@@ -73,7 +73,8 @@ function Page() {
           merged.general = {
             name: globalRes.data.name,
             logoUrl: globalRes.data.logo_url,
-            primaryColor: globalRes.data.primary_color
+            primaryColor: globalRes.data.primary_color,
+            restrictToLeads: globalRes.data.restrict_to_leads ?? false
           };
         }
 
@@ -122,7 +123,8 @@ function Page() {
         id: "current",
         name: s.general.name,
         logo_url: s.general.logoUrl,
-        primary_color: s.general.primaryColor
+        primary_color: s.general.primaryColor,
+        restrict_to_leads: s.general.restrictToLeads
       });
       if (globalErr) throw globalErr;
 
@@ -341,6 +343,17 @@ function Page() {
                       className="accent-primary"
                     />
                     <span className="text-sm">Exigir 2FA para administradores</span>
+                  </label>
+                </Field>
+                <Field label="Restrição de Acesso" icon={ShieldCheck} hint="Habilite para permitir cadastro e login apenas para e-mails presentes nas respostas do formulário (/forms).">
+                  <label className="flex items-center gap-3 h-[42px] px-3.5 rounded-xl bg-white/[0.04] border border-white/10 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={s.general.restrictToLeads}
+                      onChange={(e) => update("general", { restrictToLeads: e.target.checked })}
+                      className="accent-primary"
+                    />
+                    <span className="text-sm">Restringir cadastro e login aos Leads do forms</span>
                   </label>
                 </Field>
               </>

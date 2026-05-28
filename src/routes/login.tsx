@@ -43,6 +43,29 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      // 1. Fetch global_settings to see if restrictToLeads is active
+      const { data: settings } = await supabase
+        .from("global_settings")
+        .select("restrict_to_leads")
+        .eq("id", "current")
+        .maybeSingle();
+
+      if (settings?.restrict_to_leads) {
+        // Check if email exists in leads table anonymously using check_email_in_leads secure function
+        const { data: exists, error: rpcError } = await supabase
+          .rpc("check_email_in_leads", { check_email: email.trim().toLowerCase() });
+
+        if (rpcError) {
+          console.error("Error checking lead email:", rpcError);
+        }
+
+        if (!exists) {
+          toast.error("Este e-mail não consta na nossa lista de leads autorizados. Por favor, preencha o formulário de aplicação em /forms primeiro!");
+          setLoading(false);
+          return;
+        }
+      }
+
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
