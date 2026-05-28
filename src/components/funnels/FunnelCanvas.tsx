@@ -15,6 +15,7 @@ import {
   ReactFlowInstance,
   ConnectionMode,
   SelectionMode,
+  useViewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { toPng, toSvg } from 'html-to-image';
@@ -28,7 +29,7 @@ import { FunnelEducationalContext } from './FunnelEducationalContext';
 import { FunnelTrackingDialog } from './FunnelTrackingDialog';
 import { FunnelAnalyticsPanel } from './FunnelAnalyticsPanel';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eraser, Trash2, Paintbrush, Circle } from 'lucide-react';
 import { Funnel } from '@/hooks/useFunnels';
 import { useFunnelAnalytics } from '@/hooks/useFunnelAnalytics';
 
@@ -65,6 +66,125 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
   });
   const edgeReconnectSuccessful = useRef(true);
   const copiedNodesRef = useRef<Node[]>([]);
+
+  // --- FREEHAND DRAWING STATES (MIRO STYLE) ---
+  const { x, y, zoom } = useViewport();
+  interface DrawPath {
+    id: string;
+    points: { x: number; y: number }[];
+    color: string;
+    width: number;
+  }
+  const [drawings, setDrawings] = useState<DrawPath[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`nebula_funnel_drawings_${funnel.id}`);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (_) {}
+      }
+    }
+    return [];
+  });
+  const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawColor, setDrawColor] = useState('#8B5CF6'); // Purple default
+  const [drawWidth, setDrawWidth] = useState(3);
+  const [isEraserMode, setIsEraserMode] = useState(false);
+
+  // Sync drawings when funnel changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`nebula_funnel_drawings_${funnel.id}`);
+      if (saved) {
+        try {
+          setDrawings(JSON.parse(saved));
+          return;
+        } catch (_) {}
+      }
+      setDrawings([]);
+    }
+  }, [funnel.id]);
+
+  const saveDrawings = (newDrawings: DrawPath[]) => {
+    setDrawings(newDrawings);
+    localStorage.setItem(`nebula_funnel_drawings_${funnel.id}`, JSON.stringify(newDrawings));
+  };
+
+  const getFlowCoords = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!reactFlowInstance || !reactFlowWrapper.current) return null;
+    return reactFlowInstance.screenToFlowPosition({
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (interactionMode !== 'draw') return;
+    e.preventDefault();
+    const coords = getFlowCoords(e);
+    if (!coords) return;
+
+    if (isEraserMode) {
+      eraseAt(coords);
+      setIsDrawing(true);
+    } else {
+      setCurrentPath([coords]);
+      setIsDrawing(true);
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!isDrawing || interactionMode !== 'draw') return;
+    e.preventDefault();
+    const coords = getFlowCoords(e);
+    if (!coords) return;
+
+    if (isEraserMode) {
+      eraseAt(coords);
+    } else {
+      setCurrentPath((prev) => [...prev, coords]);
+    }
+  };
+
+  const onPointerUp = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+
+    if (!isEraserMode && currentPath.length > 1) {
+      const newPath: DrawPath = {
+        id: `draw-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        points: currentPath,
+        color: drawColor,
+        width: drawWidth,
+      };
+      const updated = [...drawings, newPath];
+      saveDrawings(updated);
+    }
+    setCurrentPath([]);
+  };
+
+  const eraseAt = (point: { x: number; y: number }) => {
+    const ERASE_THRESHOLD = 20 / zoom; // Adjust eraser size based on zoom level
+    const updatedDrawings = drawings.filter((path) => {
+      return !path.points.some((p) => {
+        const dist = Math.hypot(p.x - point.x, p.y - point.y);
+        return dist < ERASE_THRESHOLD;
+      });
+    });
+    if (updatedDrawings.length !== drawings.length) {
+      saveDrawings(updatedDrawings);
+    }
+  };
+
+  const handleClearDrawings = () => {
+    saveDrawings([]);
+    toast.success("Desenhos limpos!");
+  };
+
+  const getPathD = (points: { x: number; y: number }[]) => {
+    if (points.length === 0) return '';
+    if (points.length === 1) return `M ${points[0].x} ${points[0].y} L ${points[0].x} ${points[0].y}`;
+    return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+  };
 
   // Multi-connection: Shift+Click to select sources, then click target to connect all
   const [multiConnectSources, setMultiConnectSources] = useState<string[]>([]);
@@ -907,6 +1027,11 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
         setInteractionMode('pan');
       }
 
+      // D - Draw mode
+      if (event.key === 'd' || event.key === 'D') {
+        setInteractionMode('draw');
+      }
+
       // Ctrl+Z / Cmd+Z - Undo
       if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
         event.preventDefault();
@@ -1128,6 +1253,126 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
           hasTrackingToken={!!trackingToken}
         />
 
+        {/* Draw Mode sub-toolbar with Miro-style colors and tools */}
+        {interactionMode === 'draw' && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3 px-4 py-2 rounded-full bg-[#16161c]/95 border border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-in fade-in slide-in-from-top-3 duration-200">
+            {/* Tool Selector: Brush vs Eraser */}
+            <div className="flex items-center bg-white/[0.04] rounded-full p-0.5 border border-white/5 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEraserMode(false)}
+                className={cn(
+                  "h-7 px-3 text-xs rounded-full transition-all flex items-center gap-1.5",
+                  !isEraserMode
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "hover:bg-white/[0.06] text-muted-foreground"
+                )}
+                title="Pincel"
+              >
+                <Paintbrush className="w-3.5 h-3.5" />
+                <span>Pincel</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEraserMode(true)}
+                className={cn(
+                  "h-7 px-3 text-xs rounded-full transition-all flex items-center gap-1.5",
+                  isEraserMode
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "hover:bg-white/[0.06] text-muted-foreground"
+                )}
+                title="Borracha"
+              >
+                <Eraser className="w-3.5 h-3.5" />
+                <span>Borracha</span>
+              </Button>
+            </div>
+
+            <div className="w-px h-5 bg-white/10 shrink-0" />
+
+            {/* Brush Colors (Only show when not in eraser mode) */}
+            {!isEraserMode && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {[
+                  { hex: '#8B5CF6', label: 'Roxo' },
+                  { hex: '#06B6D4', label: 'Ciano' },
+                  { hex: '#10B981', label: 'Verde' },
+                  { hex: '#F59E0B', label: 'Laranja' },
+                  { hex: '#EF4444', label: 'Vermelho' },
+                  { hex: '#FFFFFF', label: 'Branco' }
+                ].map((color) => (
+                  <button
+                    key={color.hex}
+                    onClick={() => setDrawColor(color.hex)}
+                    className={cn(
+                      "h-5 w-5 rounded-full border transition-all flex items-center justify-center cursor-pointer",
+                      drawColor === color.hex
+                        ? "border-white scale-110 shadow-lg shadow-white/20"
+                        : "border-transparent opacity-60 hover:opacity-100 hover:scale-105"
+                    )}
+                    style={{ backgroundColor: color.hex }}
+                    title={color.label}
+                  >
+                    {drawColor === color.hex && (
+                      <div className="h-1.5 w-1.5 rounded-full bg-black/60" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Eraser Indicator (Only show when in eraser mode) */}
+            {isEraserMode && (
+              <span className="text-[10px] text-orange-400 font-bold uppercase tracking-wider animate-pulse select-none shrink-0">
+                Arraste sobre os traços para apagar
+              </span>
+            )}
+
+            <div className="w-px h-5 bg-white/10 shrink-0" />
+
+            {/* Brush Thickness selector (Only show when not in eraser mode) */}
+            {!isEraserMode && (
+              <div className="flex items-center bg-white/[0.04] rounded-full p-0.5 border border-white/5 shrink-0">
+                {[
+                  { width: 2, label: 'Fino' },
+                  { width: 4, label: 'Médio' },
+                  { width: 7, label: 'Grosso' }
+                ].map((size) => (
+                  <button
+                    key={size.width}
+                    onClick={() => setDrawWidth(size.width)}
+                    className={cn(
+                      "px-2.5 py-1 text-[10px] font-semibold rounded-full transition-all cursor-pointer",
+                      drawWidth === size.width
+                        ? "bg-white/10 text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {size.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {!isEraserMode && <div className="w-px h-5 bg-white/10 shrink-0" />}
+
+            {/* Clear Drawings Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearDrawings}
+              disabled={drawings.length === 0}
+              className="h-7 px-2.5 rounded-full hover:bg-red-500/10 hover:text-red-400 text-muted-foreground transition-all shrink-0 text-xs gap-1 cursor-pointer"
+              title="Limpar todos os desenhos"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Limpar</span>
+            </Button>
+          </div>
+        )}
+
         {/* React Flow Canvas wrapped in Educational Context */}
         <FunnelEducationalContext.Provider value={{ educationalMode }}>
           <div ref={reactFlowWrapper} className="h-full">
@@ -1178,6 +1423,48 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
                 color="rgba(255,255,255,0.05)"
               />
             </ReactFlow>
+
+            {/* Freehand drawings SVG layer overlay */}
+            <svg 
+              className={cn(
+                "absolute inset-0 z-[5]",
+                interactionMode === 'draw' ? "pointer-events-auto cursor-crosshair" : "pointer-events-none"
+              )}
+              style={{ width: '100%', height: '100%' }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+            >
+              <g transform={`translate(${x}, ${y}) scale(${zoom})`}>
+                {/* Render finalized drawing paths */}
+                {drawings.map((path) => (
+                  <path
+                    key={path.id}
+                    d={getPathD(path.points)}
+                    fill="none"
+                    stroke={path.color}
+                    strokeWidth={path.width}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="transition-all duration-150 drop-shadow-[0_0_6px_var(--neon-glow)]"
+                    style={{
+                      ['--neon-glow' as any]: path.color
+                    }}
+                  />
+                ))}
+                {/* Render current active path while drawing */}
+                {currentPath.length > 1 && (
+                  <path
+                    d={getPathD(currentPath)}
+                    fill="none"
+                    stroke={drawColor}
+                    strokeWidth={drawWidth}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+              </g>
+            </svg>
 
             {/* Multi-connect mode indicator */}
             {multiConnectSources.length > 0 && (

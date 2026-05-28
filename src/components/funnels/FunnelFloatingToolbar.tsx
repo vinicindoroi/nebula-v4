@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Download, Radio, Hand, MousePointer2, Check, Loader2, Group, GraduationCap, Upload, Ungroup, Code } from 'lucide-react';
+import { Download, Radio, Hand, MousePointer2, Check, Loader2, Group, GraduationCap, Upload, Ungroup, Code, Pencil } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
-export type InteractionMode = 'select' | 'pan';
+export type InteractionMode = 'select' | 'pan' | 'draw';
 
 interface FunnelFloatingToolbarProps {
   onExport: (format: 'png' | 'svg') => void;
@@ -87,6 +87,20 @@ export function FunnelFloatingToolbar({
           title="Mover (H)"
         >
           <Hand className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onInteractionModeChange('draw')}
+          className={cn(
+            "h-7 w-7 p-0 rounded-full transition-all",
+            interactionMode === 'draw'
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/30"
+              : "hover:bg-white/[0.06] text-muted-foreground"
+          )}
+          title="Desenho Livre (D)"
+        >
+          <Pencil className="w-3.5 h-3.5" />
         </Button>
       </div>
 
