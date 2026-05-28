@@ -14,6 +14,8 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { notifyUser } from "@/lib/notify";
 import { useSavedPosts, useToggleSave } from "@/hooks/use-saved-posts";
 import { useAddXp, getLevel, useXp } from "@/hooks/use-xp";
+import { useAdmin } from "@/hooks/use-admin";
+
 
 export const Route = createFileRoute("/_app/community")({
   component: CommunityPage,
@@ -60,6 +62,7 @@ const formatRelativeTime = (dateStr: string) => {
 
 function CommunityPage() {
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const qc = useQueryClient();
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -74,6 +77,7 @@ function CommunityPage() {
   // --- STORIES 24H CONFIGS & STATES ---
   type Story = {
     id: string;
+    userId: string;
     userName: string;
     userAvatar: string;
     gradient: string;
@@ -110,6 +114,7 @@ function CommunityPage() {
         const DEFAULT_STORIES: Story[] = [
           {
             id: "st-1",
+            userId: "default",
             userName: "Thiago Mentor",
             userAvatar: "TM",
             gradient: "from-purple-600 via-pink-600 to-amber-500",
@@ -119,6 +124,7 @@ function CommunityPage() {
           },
           {
             id: "st-2",
+            userId: "default",
             userName: "Carol Estrategista",
             userAvatar: "CE",
             gradient: "from-blue-600 to-violet-600",
@@ -128,6 +134,7 @@ function CommunityPage() {
           },
           {
             id: "st-3",
+            userId: "default",
             userName: "Felipe Designer",
             userAvatar: "FD",
             gradient: "from-cyan-500 to-emerald-500",
@@ -137,6 +144,7 @@ function CommunityPage() {
           },
           {
             id: "st-4",
+            userId: "default",
             userName: "Marina Copy",
             userAvatar: "MC",
             gradient: "from-orange-500 to-rose-500",
@@ -148,6 +156,7 @@ function CommunityPage() {
 
         const mappedDbStories = (data || []).map((s) => ({
           id: s.id,
+          userId: s.user_id,
           userName: s.user_name,
           userAvatar: s.user_avatar,
           gradient: s.gradient,
@@ -165,6 +174,74 @@ function CommunityPage() {
 
     fetchStories();
   }, []);
+
+  // Automatic background cleanup of expired stories (> 24 hours old) to optimize database and storage usage
+  useEffect(() => {
+    if (!user) return;
+    const cleanupExpired = async () => {
+      try {
+        const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        
+        // Find stories older than 24h
+        let query = supabase
+          .from("community_stories")
+          .select("id, image_url, user_id")
+          .lt("created_at", threshold);
+        
+        // Non-admins can only delete their own stories. Let's fetch all expired ones that are owned by the user (or all if admin)
+        if (!isAdmin) {
+          query = query.eq("user_id", user.id);
+        }
+        
+        const { data: expiredStories, error: fetchErr } = await query;
+        if (fetchErr) throw fetchErr;
+
+        if (expiredStories && expiredStories.length > 0) {
+          console.log(`[Stories Cleanup] Found ${expiredStories.length} expired stories. Cleaning up...`);
+          
+          for (const story of expiredStories) {
+            // Delete from database
+            const { error: delDbErr } = await supabase
+              .from("community_stories")
+              .delete()
+              .eq("id", story.id);
+              
+            if (delDbErr) {
+              console.error(`[Stories Cleanup] Error deleting story database record ${story.id}:`, delDbErr);
+              continue;
+            }
+
+            // Delete associated storage image if exists
+            if (story.image_url) {
+              try {
+                const pathParts = story.image_url.split("/storage/v1/object/public/community/");
+                if (pathParts.length > 1) {
+                  const storagePath = pathParts[1];
+                  const { error: delStorageErr } = await supabase.storage
+                    .from("community")
+                    .remove([storagePath]);
+                    
+                  if (delStorageErr) {
+                    console.error(`[Stories Cleanup] Error removing storage object ${storagePath}:`, delStorageErr);
+                  } else {
+                    console.log(`[Stories Cleanup] Successfully removed storage object ${storagePath}`);
+                  }
+                }
+              } catch (storageErr) {
+                console.error("[Stories Cleanup] Error extracting or deleting storage file:", storageErr);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[Stories Cleanup] Background story cleanup failed:", err);
+      }
+    };
+
+    // Run cleanup after 3 seconds to not block page loading initial layout
+    const timer = setTimeout(cleanupExpired, 3000);
+    return () => clearTimeout(timer);
+  }, [user, isAdmin]);
 
   const handleStoryImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -191,11 +268,17 @@ function CommunityPage() {
   const [isCreatingStory, setIsCreatingStory] = useState(false);
   const [newStoryText, setNewStoryText] = useState("");
   const [newStoryGrad, setNewStoryGrad] = useState("from-purple-600 via-pink-600 to-amber-500");
+  const [isStoryPaused, setIsStoryPaused] = useState(false);
 
-  // Stories auto-advance
+  // Reset story progress on active story change
+  useEffect(() => {
+    setStoryProgress(0);
+  }, [activeStoryIndex]);
+
+  // Stories auto-advance with gesture pause support
   useEffect(() => {
     if (activeStoryIndex === null) return;
-    setStoryProgress(0);
+    if (isStoryPaused) return;
 
     const interval = setInterval(() => {
       setStoryProgress((p) => {
@@ -213,7 +296,7 @@ function CommunityPage() {
     }, 40);
 
     return () => clearInterval(interval);
-  }, [activeStoryIndex, stories.length]);
+  }, [activeStoryIndex, isStoryPaused, stories.length]);
 
   const handleCreateStory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,6 +344,7 @@ function CommunityPage() {
       if (data) {
         const newStory: Story = {
           id: data.id,
+          userId: data.user_id,
           userName: data.user_name,
           userAvatar: data.user_avatar,
           gradient: data.gradient,
@@ -274,9 +358,9 @@ function CommunityPage() {
         toast.success("Story operacional publicado!");
         (window as any).sendNebulaNotification?.("Novo Story Publicado! 📱", "Seu story operacional já está disponível no topo do feed da comunidade.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating community story:", err);
-      toast.error("Ocorreu um erro ao publicar o story.");
+      toast.error(`Falha ao publicar story: ${err.message || err.error_description || "Erro de rede ou banco"}`);
     } finally {
       setNewStoryText("");
       handleRemoveStoryImage();
@@ -638,102 +722,162 @@ function CommunityPage() {
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Visualizador de Story Overlay */}
-        {activeStoryIndex !== null && (() => {
-          const activeStory = stories[activeStoryIndex];
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl animate-fade-in" onClick={() => setActiveStoryIndex(null)}>
+          {/* Visualizador de Story Overlay */}
+          {activeStoryIndex !== null && (() => {
+            const activeStory = stories[activeStoryIndex];
+            if (!activeStory) return null;
+            return (
               <div 
-                className={`relative w-full h-full md:h-[90vh] md:max-w-md md:aspect-[9/16] md:border md:border-white/10 md:rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between p-6 ${
-                  activeStory.image_url ? "" : `bg-gradient-to-br ${activeStory.gradient}`
-                }`}
-                style={
-                  activeStory.image_url 
-                    ? { backgroundImage: `url(${activeStory.image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
-                    : undefined
-                }
-                onClick={(e) => e.stopPropagation()}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-2xl animate-fade-in" 
+                onClick={() => setActiveStoryIndex(null)}
               >
-                {/* Subtle dark gradient overlay for image legibility */}
-                {activeStory.image_url && (
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/15 to-black/80 z-0 pointer-events-none" />
-                )}
-                
-                {/* Progress Bar Indicators */}
-                <div className="flex gap-1.5 w-full absolute top-4 left-0 px-4 z-20">
-                  {stories.map((_, i) => {
-                    let widthVal = 0;
-                    if (i < activeStoryIndex) widthVal = 100;
-                    else if (i === activeStoryIndex) widthVal = storyProgress;
-                    return (
-                      <div key={i} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
-                        <div className="h-full bg-white transition-all duration-[40ms] ease-linear" style={{ width: `${widthVal}%` }} />
-                      </div>
-                    );
-                  })}
-                </div>
+                <div 
+                  className={`relative w-full h-full md:h-[92vh] md:max-w-lg md:aspect-[9/16] md:border md:border-white/10 md:rounded-[32px] overflow-hidden shadow-[0_0_80px_-10px_rgba(139,92,246,0.25)] flex flex-col justify-between p-6 transition-all duration-300 ${
+                    activeStory.image_url ? "" : `bg-gradient-to-br ${activeStory.gradient}`
+                  }`}
+                  style={
+                    activeStory.image_url 
+                      ? { backgroundImage: `url(${activeStory.image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
+                      : undefined
+                  }
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={() => setIsStoryPaused(true)}
+                  onMouseUp={() => setIsStoryPaused(false)}
+                  onMouseLeave={() => setIsStoryPaused(false)}
+                  onTouchStart={() => setIsStoryPaused(true)}
+                  onTouchEnd={() => setIsStoryPaused(false)}
+                >
+                  {/* Subtle dark gradient overlay for image legibility */}
+                  {activeStory.image_url && (
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/10 to-black/85 z-0 pointer-events-none" />
+                  )}
+                  
+                  {/* Progress Bar Indicators */}
+                  <div className="flex gap-1.5 w-full absolute top-4 left-0 px-4 z-20">
+                    {stories.map((_, i) => {
+                      let widthVal = 0;
+                      if (i < activeStoryIndex) widthVal = 100;
+                      else if (i === activeStoryIndex) widthVal = storyProgress;
+                      return (
+                        <div key={i} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+                          <div className="h-full bg-white transition-all duration-[40ms] ease-linear" style={{ width: `${widthVal}%` }} />
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                {/* Story Header */}
-                <div className="flex items-center justify-between mt-3 z-10">
-                  <div className="flex items-center gap-2">
-                    <div className={`h-8 w-8 rounded-full bg-gradient-to-br ${activeStory.gradient} flex items-center justify-center font-bold text-xs border border-white/10 shadow text-white`}>
-                      {activeStory.userAvatar}
+                  {/* Story Header */}
+                  <div className="flex items-center justify-between mt-3 z-10">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${activeStory.gradient} flex items-center justify-center font-bold text-xs border border-white/15 shadow-md text-white select-none`}>
+                        {activeStory.userAvatar}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white drop-shadow-md select-none">{activeStory.userName}</div>
+                        <div className="text-[10px] text-white/70 drop-shadow select-none">{activeStory.date}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-white drop-shadow">{activeStory.userName}</div>
-                      <div className="text-[9px] text-white/70 drop-shadow">{activeStory.date}</div>
+                    <div className="flex items-center gap-2">
+                      {(activeStory.userId === user?.id || isAdmin) && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (confirm("Deseja realmente apagar este story?")) {
+                              try {
+                                const { error: dbErr } = await supabase
+                                  .from("community_stories")
+                                  .delete()
+                                  .eq("id", activeStory.id);
+                                if (dbErr) throw dbErr;
+
+                                if (activeStory.image_url) {
+                                  try {
+                                    const pathParts = activeStory.image_url.split("/storage/v1/object/public/community/");
+                                    if (pathParts.length > 1) {
+                                      const storagePath = pathParts[1];
+                                      const { error: delStorageErr } = await supabase.storage
+                                        .from("community")
+                                        .remove([storagePath]);
+                                      if (delStorageErr) throw delStorageErr;
+                                    }
+                                  } catch (storageErr) {
+                                    console.error("Error removing story storage file:", storageErr);
+                                  }
+                                }
+                                
+                                toast.success("Story operacional excluído!");
+                                setStories((prev) => prev.filter((s) => s.id !== activeStory.id));
+                                setActiveStoryIndex(null);
+                              } catch (err: any) {
+                                toast.error(`Erro ao excluir story: ${err.message || "Erro desconhecido"}`);
+                              }
+                            }
+                          }}
+                          className="p-1.5 rounded-full hover:bg-red-500/20 text-white/80 hover:text-red-400 transition cursor-pointer"
+                          title="Excluir Story"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setActiveStoryIndex(null)}
+                        className="p-1.5 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveStoryIndex(null)}
-                    className="p-1 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
 
-                {/* Tap Left / Right Areas for navigation */}
-                <div className="absolute inset-x-0 top-16 bottom-20 flex z-10 pointer-events-auto">
-                  <div 
-                    className="w-1/3 h-full cursor-w-resize" 
-                    onClick={() => {
-                      if (activeStoryIndex > 0) setActiveStoryIndex(activeStoryIndex - 1);
-                      else setActiveStoryIndex(null);
-                    }}
-                  />
-                  <div className="w-1/3 h-full" onClick={() => setActiveStoryIndex(null)} />
-                  <div 
-                    className="w-1/3 h-full cursor-e-resize" 
-                    onClick={() => {
-                      if (activeStoryIndex < stories.length - 1) setActiveStoryIndex(activeStoryIndex + 1);
-                      else setActiveStoryIndex(null);
-                    }}
-                  />
-                </div>
+                  {/* Tap Left / Right Areas for navigation */}
+                  <div className="absolute inset-x-0 top-16 bottom-24 flex z-10 pointer-events-auto">
+                    <div 
+                      className="w-1/4 h-full cursor-w-resize" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeStoryIndex > 0) setActiveStoryIndex(activeStoryIndex - 1);
+                        else setActiveStoryIndex(null);
+                      }}
+                    />
+                    <div className="w-2/4 h-full" />
+                    <div 
+                      className="w-1/4 h-full cursor-e-resize" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeStoryIndex < stories.length - 1) setActiveStoryIndex(activeStoryIndex + 1);
+                        else setActiveStoryIndex(null);
+                      }}
+                    />
+                  </div>
 
-                {/* Story Text Content with Glowing Premium Design */}
-                <div className="flex-1 flex items-center justify-center text-center p-4 z-10 select-none">
-                  <p className={`font-black leading-relaxed tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] ${
-                    activeStory.image_url 
-                      ? "text-sm sm:text-base mt-auto mb-10 bg-black/40 backdrop-blur-md px-4 py-3.5 rounded-2xl border border-white/10 shadow-lg text-left w-full"
-                      : "text-lg sm:text-xl px-2"
-                  }`}>
-                    {activeStory.content}
-                  </p>
-                </div>
+                  {/* Story Text Content with Glowing Premium Design */}
+                  <div className="flex-1 flex items-center justify-center p-4 z-10 select-none">
+                    {activeStory.image_url ? (
+                      <div className="bg-black/35 backdrop-blur-lg px-5 py-4 rounded-3xl border border-white/10 shadow-2xl text-left w-full max-w-[92%] mx-auto mt-auto mb-12 select-none animate-fade-up">
+                        <p className="text-[13px] font-medium leading-relaxed tracking-wide text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
+                          {activeStory.content}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xl sm:text-2xl font-black text-white px-6 select-none drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)] tracking-tight leading-relaxed max-w-sm mx-auto text-center duration-300 transform scale-102">
+                        {activeStory.content}
+                      </p>
+                    )}
+                  </div>
 
-                {/* Quick Footer Action */}
-                <div className="text-center text-[10px] text-muted-foreground z-10 flex justify-center items-center gap-1 pb-1">
-                  <Sparkles className="h-3 w-3 text-primary" /> Toque nas laterais para navegar
-                </div>
+                  {/* Quick Footer Action */}
+                  <div className="text-center text-[10px] text-white/55 z-10 flex justify-center items-center gap-1.5 pb-1 select-none pointer-events-none">
+                    <Sparkles className="h-3 w-3 text-primary animate-pulse" />
+                    <span>Segure para pausar · Toque nas laterais para navegar</span>
+                  </div>
 
+                </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
+        </div>
 
         {/* Story Creator Overlay */}
         {isCreatingStory && (

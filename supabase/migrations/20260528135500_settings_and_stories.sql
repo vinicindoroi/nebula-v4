@@ -76,8 +76,12 @@ CREATE TABLE IF NOT EXISTS public.community_stories (
   user_avatar text NOT NULL,
   gradient text NOT NULL,
   content text NOT NULL,
+  image_url text,
   created_at timestamptz DEFAULT now() NOT NULL
 );
+
+-- Ensure image_url column exists if table was already created
+ALTER TABLE public.community_stories ADD COLUMN IF NOT EXISTS image_url text;
 
 -- Enable RLS for community_stories
 ALTER TABLE public.community_stories ENABLE ROW LEVEL SECURITY;
