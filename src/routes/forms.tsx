@@ -9,7 +9,16 @@ export const Route = createFileRoute("/forms")({
   head: () => ({ meta: [{ title: "Formulário Interativo — Nebula" }] }),
 });
 
-type StepId = "name" | "phone" | "email" | "mentorship";
+const generateUUID = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
 
 function FormsPage() {
   // Step navigation state
@@ -128,22 +137,20 @@ function FormsPage() {
         if (error) throw error;
         toast.success("Informações atualizadas com sucesso!");
       } else {
-        // Insert new submission into Supabase
-        const { data, error } = await supabase
+        // Insert new submission into Supabase with client-generated UUID
+        const newId = generateUUID();
+        const { error } = await supabase
           .from("form_submissions")
           .insert({
+            id: newId,
             name: name.trim(),
             phone: phone.trim(),
             email: email.trim().toLowerCase(),
             mentorship: finalMentorship
-          })
-          .select()
-          .single();
+          });
 
         if (error) throw error;
-        if (data) {
-          setCurrentSubmissionId(data.id);
-        }
+        setCurrentSubmissionId(newId);
         toast.success("Enviado com sucesso!");
       }
       setSuccess(true);
