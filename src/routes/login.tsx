@@ -117,7 +117,7 @@ function LoginPage() {
           </form>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            <Link to="/" className="hover:text-foreground transition-colors">← Voltar</Link>
+            <a href="/" className="hover:text-foreground transition-colors">← Voltar</a>
           </p>
         </div>
       </div>

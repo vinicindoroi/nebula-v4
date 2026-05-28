@@ -528,12 +528,12 @@ function FormsPage() {
                 >
                   Enviar outro
                 </button>
-                <Link
-                  to="/"
+                <a
+                  href="/"
                   className="w-full inline-flex items-center justify-center bg-white/5 border border-white/8 hover:bg-white/10 text-foreground rounded-lg py-2.5 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Voltar ao Início
-                </Link>
+                </a>
               </div>
             </div>
           )}
@@ -541,9 +541,9 @@ function FormsPage() {
           {/* Minimalist Footer Back Link */}
           {!success && (
             <div className="text-center text-[10px] text-muted-foreground/60 mt-6 border-t border-white/[0.04] pt-4">
-              <Link to="/" className="hover:text-foreground transition-colors">
+              <a href="/" className="hover:text-foreground transition-colors">
                 ← Voltar para a Home
-              </Link>
+              </a>
             </div>
           )}
 
