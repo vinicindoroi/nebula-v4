@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollText, Search, RefreshCw, Trash2, Mail, Phone, Calendar, Copy, Check } from "lucide-react";
+import { ScrollText, Search, RefreshCw, Trash2, Mail, Phone, Calendar, Copy, Check, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/admin/Modal";
 import { supabase } from "@/integrations/supabase/client";
@@ -183,6 +183,33 @@ function AdminFormsPage() {
     }
   };
 
+  const { totalSubmissions, mostPopularMentorship } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    submissions.forEach((sub) => {
+      const key = sub.mentorship || "Não especificado";
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    let bestName = "Nenhuma";
+    let bestCount = 0;
+    Object.entries(counts).forEach(([name, count]) => {
+      if (count > bestCount) {
+        bestName = name;
+        bestCount = count;
+      }
+    });
+
+    const formattedBestName = bestName.charAt(0).toUpperCase() + bestName.slice(1);
+
+    return {
+      totalSubmissions: submissions.length,
+      mostPopularMentorship: {
+        name: formattedBestName,
+        count: bestCount,
+      },
+    };
+  }, [submissions]);
+
   const filtered = useMemo(() => {
     return submissions.filter((s) => {
       const searchStr = `${s.name} ${s.email} ${s.phone} ${s.mentorship}`.toLowerCase();
@@ -223,6 +250,44 @@ function AdminFormsPage() {
               Limpar tudo
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Sleek Dynamic Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Total applications card */}
+        <div className="glass rounded-2xl p-5 border border-white/[0.06] bg-white/[0.01] flex items-center justify-between relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent pointer-events-none" />
+          <div className="space-y-1">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total de Aplicações</span>
+            <div className="text-2xl font-bold text-foreground">{totalSubmissions}</div>
+            <p className="text-[10px] text-muted-foreground/60">Contatos únicos capturados no forms</p>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+            <ScrollText className="h-5 w-5" />
+          </div>
+        </div>
+
+        {/* Most popular mentorship card */}
+        <div className="glass rounded-2xl p-5 border border-white/[0.06] bg-white/[0.01] flex items-center justify-between relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-transparent to-transparent pointer-events-none" />
+          <div className="space-y-1">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Mentoria Mais Procurada</span>
+            <div className="text-2xl font-bold text-foreground capitalize">
+              {mostPopularMentorship.count > 0 ? (
+                <>
+                  {mostPopularMentorship.name}{" "}
+                  <span className="text-sm font-semibold text-amber-400">({mostPopularMentorship.count} {mostPopularMentorship.count === 1 ? "aluno" : "alunos"})</span>
+                </>
+              ) : (
+                "Nenhuma"
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground/60">Maior volume de interesse selecionado</p>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+            <Crown className="h-5 w-5 fill-amber-400/20" />
+          </div>
         </div>
       </div>
 
