@@ -116,10 +116,10 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
 
   const getFlowCoords = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!reactFlowInstance || !reactFlowWrapper.current) return null;
-    return reactFlowInstance.screenToFlowPosition({
-      x: e.clientX,
-      y: e.clientY,
-    });
+    const rect = reactFlowWrapper.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left - viewport.x) / viewport.zoom;
+    const y = (e.clientY - rect.top - viewport.y) / viewport.zoom;
+    return { x, y };
   };
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
