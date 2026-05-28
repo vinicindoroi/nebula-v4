@@ -78,18 +78,24 @@ function CommunityPage() {
     userAvatar: string;
     gradient: string;
     content: string;
+    image_url?: string | null;
     date: string;
     viewed?: boolean;
   };
 
   const [stories, setStories] = useState<Story[]>([]);
+  const [storyImageFile, setStoryImageFile] = useState<File | null>(null);
+  const [storyImagePreview, setStoryImagePreview] = useState<string | null>(null);
+  const storyFileRef = useRef<HTMLInputElement>(null);
 
+  // Load stories from Supabase (within 24 hours)
   useEffect(() => {
     const fetchStories = async () => {
       try {
         const { data, error } = await supabase
           .from("community_stories")
           .select("*")
+          .gt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
           .order("created_at", { ascending: false });
 
         if (error) throw error;
@@ -146,6 +152,7 @@ function CommunityPage() {
           userAvatar: s.user_avatar,
           gradient: s.gradient,
           content: s.content,
+          image_url: s.image_url,
           date: formatRelativeTime(s.created_at),
           viewed: viewedIds.includes(s.id)
         }));
@@ -158,6 +165,26 @@ function CommunityPage() {
 
     fetchStories();
   }, []);
+
+  const handleStoryImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("A imagem deve ter no máximo 5MB.");
+        return;
+      }
+      setStoryImageFile(file);
+      if (storyImagePreview) URL.revokeObjectURL(storyImagePreview);
+      setStoryImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveStoryImage = () => {
+    setStoryImageFile(null);
+    if (storyImagePreview) URL.revokeObjectURL(storyImagePreview);
+    setStoryImagePreview(null);
+    if (storyFileRef.current) storyFileRef.current.value = "";
+  };
 
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [storyProgress, setStoryProgress] = useState(0);
@@ -190,7 +217,11 @@ function CommunityPage() {
 
   const handleCreateStory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStoryText.trim() || !user) return;
+    if (!newStoryText.trim() && !storyImageFile) {
+      toast.error("Por favor, digite uma mensagem ou selecione uma imagem.");
+      return;
+    }
+    if (!user) return;
 
     const uName = myProfile?.full_name || "Membro Star";
     const uAvatar = (myProfile?.full_name || "MS")
@@ -201,6 +232,17 @@ function CommunityPage() {
       .slice(0, 2);
 
     try {
+      let image_url: string | null = null;
+      if (storyImageFile) {
+        const ext = storyImageFile.name.split(".").pop() ?? "jpg";
+        const path = `stories/${user.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("community").upload(path, storyImageFile);
+        if (upErr) throw upErr;
+        
+        const { data: urlData } = supabase.storage.from("community").getPublicUrl(path);
+        image_url = urlData.publicUrl;
+      }
+
       const { data, error } = await supabase
         .from("community_stories")
         .insert({
@@ -208,7 +250,8 @@ function CommunityPage() {
           user_name: uName,
           user_avatar: uAvatar,
           gradient: newStoryGrad,
-          content: newStoryText.trim()
+          content: newStoryText.trim(),
+          image_url: image_url
         })
         .select()
         .single();
@@ -222,6 +265,7 @@ function CommunityPage() {
           userAvatar: data.user_avatar,
           gradient: data.gradient,
           content: data.content,
+          image_url: data.image_url,
           date: "agora mesmo",
           viewed: false
         };
@@ -235,6 +279,7 @@ function CommunityPage() {
       toast.error("Ocorreu um erro ao publicar o story.");
     } finally {
       setNewStoryText("");
+      handleRemoveStoryImage();
       setIsCreatingStory(false);
     }
   };
@@ -599,8 +644,22 @@ function CommunityPage() {
         {activeStoryIndex !== null && (() => {
           const activeStory = stories[activeStoryIndex];
           return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in" onClick={() => setActiveStoryIndex(null)}>
-              <div className="relative w-full max-w-sm aspect-[9/16] bg-gradient-to-b from-[#161618] to-[#0c0c0e] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between p-6 mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl animate-fade-in" onClick={() => setActiveStoryIndex(null)}>
+              <div 
+                className={`relative w-full h-full md:h-[90vh] md:max-w-md md:aspect-[9/16] md:border md:border-white/10 md:rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between p-6 ${
+                  activeStory.image_url ? "" : `bg-gradient-to-br ${activeStory.gradient}`
+                }`}
+                style={
+                  activeStory.image_url 
+                    ? { backgroundImage: `url(${activeStory.image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
+                    : undefined
+                }
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Subtle dark gradient overlay for image legibility */}
+                {activeStory.image_url && (
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/15 to-black/80 z-0 pointer-events-none" />
+                )}
                 
                 {/* Progress Bar Indicators */}
                 <div className="flex gap-1.5 w-full absolute top-4 left-0 px-4 z-20">
@@ -623,14 +682,14 @@ function CommunityPage() {
                       {activeStory.userAvatar}
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-foreground">{activeStory.userName}</div>
-                      <div className="text-[9px] text-muted-foreground/60">{activeStory.date}</div>
+                      <div className="text-xs font-bold text-white drop-shadow">{activeStory.userName}</div>
+                      <div className="text-[9px] text-white/70 drop-shadow">{activeStory.date}</div>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setActiveStoryIndex(null)}
-                    className="p-1 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                    className="p-1 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -655,12 +714,14 @@ function CommunityPage() {
                   />
                 </div>
 
-                {/* Story Body Card with Glowing Premium Design */}
-                <div className={`flex-1 mx-2 my-6 rounded-2xl bg-gradient-to-br ${activeStory.gradient} p-6 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-xl border border-white/10`}>
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-                  <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 rounded-full blur-2xl" />
-                  <p className="text-md sm:text-lg font-black text-white leading-relaxed z-10 tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-                    "{activeStory.content}"
+                {/* Story Text Content with Glowing Premium Design */}
+                <div className="flex-1 flex items-center justify-center text-center p-4 z-10 select-none">
+                  <p className={`font-black leading-relaxed tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] ${
+                    activeStory.image_url 
+                      ? "text-sm sm:text-base mt-auto mb-10 bg-black/40 backdrop-blur-md px-4 py-3.5 rounded-2xl border border-white/10 shadow-lg text-left w-full"
+                      : "text-lg sm:text-xl px-2"
+                  }`}>
+                    {activeStory.content}
                   </p>
                 </div>
 
@@ -695,7 +756,6 @@ function CommunityPage() {
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Qual é o seu faturamento ou dica de hoje?</span>
                   <textarea
-                    required
                     maxLength={160}
                     placeholder="Ex: Novo recorde! R$ 4.2k faturados hoje de manhã no tráfego direto! 📈🔥"
                     value={newStoryText}
@@ -703,6 +763,45 @@ function CommunityPage() {
                     className="w-full h-24 bg-white/[0.02] border border-white/10 rounded-xl p-3 text-xs text-foreground placeholder:text-muted-foreground/35 outline-none focus:border-primary/50 transition-all resize-none bg-background"
                   />
                   <span className="text-[9px] text-muted-foreground/40 block text-right mt-0.5">{160 - newStoryText.length} caracteres restantes</span>
+                </div>
+
+                {/* Upload de Imagem */}
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">
+                    Adicionar Imagem (Opcional)
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      ref={storyFileRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleStoryImageChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => storyFileRef.current?.click()}
+                      className="px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs font-semibold text-foreground hover:bg-white/10 transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                      <span>{storyImageFile ? "Alterar Imagem" : "Escolher Imagem"}</span>
+                    </button>
+                    {storyImageFile && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground truncate max-w-[150px] font-mono">
+                          {storyImageFile.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleRemoveStoryImage}
+                          className="p-1 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition cursor-pointer"
+                          title="Remover imagem"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -734,10 +833,21 @@ function CommunityPage() {
               {/* Preview Story */}
               <div className="pt-2">
                 <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Prévia do Layout</span>
-                <div className={`w-full aspect-[16/9] rounded-xl bg-gradient-to-br ${newStoryGrad} p-4 flex items-center justify-center text-center border border-white/10 shadow relative overflow-hidden`}>
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl" />
-                  <p className="text-[10px] font-black text-white max-w-[200px] leading-relaxed select-none drop-shadow">
-                    "{newStoryText.trim() || "Digite um texto acima..."}"
+                <div 
+                  className={`w-full aspect-[16/9] rounded-xl p-4 flex items-center justify-center text-center border border-white/10 shadow relative overflow-hidden ${
+                    storyImagePreview ? "" : `bg-gradient-to-br ${newStoryGrad}`
+                  }`}
+                  style={
+                    storyImagePreview 
+                      ? { backgroundImage: `url(${storyImagePreview})`, backgroundSize: "cover", backgroundPosition: "center" }
+                      : undefined
+                  }
+                >
+                  {storyImagePreview && (
+                    <div className="absolute inset-0 bg-black/45 z-0" />
+                  )}
+                  <p className="text-[10px] font-black text-white max-w-[200px] leading-relaxed select-none drop-shadow relative z-10">
+                    "{newStoryText.trim() || (storyImagePreview ? "Adicione um texto (opcional)" : "Digite um texto acima...")}"
                   </p>
                 </div>
               </div>

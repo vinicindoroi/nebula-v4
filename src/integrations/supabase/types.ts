@@ -298,6 +298,7 @@ export type Database = {
           user_avatar: string
           gradient: string
           content: string
+          image_url: string | null
           created_at: string
         }
         Insert: {
@@ -307,6 +308,7 @@ export type Database = {
           user_avatar: string
           gradient: string
           content: string
+          image_url?: string | null
           created_at?: string
         }
         Update: {
@@ -316,6 +318,7 @@ export type Database = {
           user_avatar?: string
           gradient?: string
           content?: string
+          image_url?: string | null
           created_at?: string
         }
         Relationships: []
