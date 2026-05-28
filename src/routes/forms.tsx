@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { ArrowRight, ArrowLeft, Check, Compass, HelpCircle } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Compass, HelpCircle, Pencil } from "lucide-react";
 
 export const Route = createFileRoute("/forms")({
   component: FormsPage,
@@ -24,6 +24,7 @@ function FormsPage() {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null);
 
   // Focus refs for autofocus on step change
   const nameRef = useRef<HTMLInputElement>(null);
@@ -112,8 +113,9 @@ function FormsPage() {
     setLoading(false);
     
     const finalMentorship = mentorship === "outra" ? customMentorship.trim() : mentorship;
+    const submissionId = currentSubmissionId || Math.random().toString(36).substring(2, 9);
     const submission = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: submissionId,
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim().toLowerCase(),
@@ -123,12 +125,31 @@ function FormsPage() {
 
     // Save to shared list of submissions in localStorage
     const existingSubmissions = JSON.parse(localStorage.getItem("nebula_form_submissions") || "[]");
-    existingSubmissions.unshift(submission);
+    
+    if (currentSubmissionId) {
+      // Update existing submission if editing
+      const index = existingSubmissions.findIndex((s: any) => s.id === currentSubmissionId);
+      if (index !== -1) {
+        existingSubmissions[index] = submission;
+      } else {
+        existingSubmissions.unshift(submission);
+      }
+    } else {
+      existingSubmissions.unshift(submission);
+      setCurrentSubmissionId(submissionId);
+    }
+    
     localStorage.setItem("nebula_form_submissions", JSON.stringify(existingSubmissions));
     console.log("Registered submission:", submission);
 
     setSuccess(true);
     toast.success("Enviado com sucesso!");
+  };
+
+  const handleEditField = (targetStep: number) => {
+    setSuccess(false);
+    setStep(targetStep);
+    toast.info("Você pode corrigir esta informação agora.");
   };
 
   const handleReset = () => {
@@ -139,6 +160,7 @@ function FormsPage() {
     setCustomMentorship("");
     setStep(1);
     setSuccess(false);
+    setCurrentSubmissionId(null);
   };
 
   // Calculating progress percentage
@@ -396,11 +418,72 @@ function FormsPage() {
               </p>
 
               {/* Simple Details Table */}
-              <div className="glass rounded-xl p-5 my-6 text-xs border border-white/[0.04] bg-white/[0.01] space-y-2.5">
-                <div className="flex justify-between"><span className="text-muted-foreground">Nome:</span> <span className="text-foreground font-medium">{name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Celular:</span> <span className="text-foreground font-medium">{phone}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">E-mail:</span> <span className="text-foreground font-medium">{email}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Mentoria:</span> <span className="text-primary font-bold capitalize">{mentorship === "outra" ? customMentorship : mentorship}</span></div>
+              <div className="glass rounded-xl p-5 my-6 text-xs border border-white/[0.04] bg-white/[0.01] space-y-3">
+                
+                {/* Nome Row */}
+                <div className="flex justify-between items-center group/row border-b border-white/[0.03] pb-2 last:border-0 last:pb-0">
+                  <div className="flex flex-col text-left">
+                    <span className="text-[10px] text-muted-foreground/60 uppercase font-bold tracking-wider font-mono">Nome</span>
+                    <span className="text-foreground font-medium text-xs mt-0.5">{name}</span>
+                  </div>
+                  <button
+                    onClick={() => handleEditField(1)}
+                    className="p-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] opacity-45 hover:opacity-100 hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-all flex items-center gap-1 cursor-pointer text-[10px] font-semibold"
+                    title="Editar nome"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span>Editar</span>
+                  </button>
+                </div>
+
+                {/* Celular Row */}
+                <div className="flex justify-between items-center group/row border-b border-white/[0.03] pb-2 last:border-0 last:pb-0">
+                  <div className="flex flex-col text-left">
+                    <span className="text-[10px] text-muted-foreground/60 uppercase font-bold tracking-wider font-mono">Celular</span>
+                    <span className="text-foreground font-medium text-xs mt-0.5">{phone}</span>
+                  </div>
+                  <button
+                    onClick={() => handleEditField(2)}
+                    className="p-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] opacity-45 hover:opacity-100 hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-all flex items-center gap-1 cursor-pointer text-[10px] font-semibold"
+                    title="Editar celular"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span>Editar</span>
+                  </button>
+                </div>
+
+                {/* E-mail Row */}
+                <div className="flex justify-between items-center group/row border-b border-white/[0.03] pb-2 last:border-0 last:pb-0">
+                  <div className="flex flex-col text-left">
+                    <span className="text-[10px] text-muted-foreground/60 uppercase font-bold tracking-wider font-mono">E-mail</span>
+                    <span className="text-foreground font-medium text-xs mt-0.5 break-all pr-2">{email}</span>
+                  </div>
+                  <button
+                    onClick={() => handleEditField(3)}
+                    className="p-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] opacity-45 hover:opacity-100 hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-all flex items-center gap-1 cursor-pointer text-[10px] font-semibold shrink-0"
+                    title="Editar e-mail"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span>Editar</span>
+                  </button>
+                </div>
+
+                {/* Mentoria Row */}
+                <div className="flex justify-between items-center group/row border-b border-white/[0.03] pb-2 last:border-0 last:pb-0">
+                  <div className="flex flex-col text-left">
+                    <span className="text-[10px] text-muted-foreground/60 uppercase font-bold tracking-wider font-mono">Mentoria</span>
+                    <span className="text-primary font-bold text-xs mt-0.5 capitalize">{mentorship === "outra" ? customMentorship : mentorship}</span>
+                  </div>
+                  <button
+                    onClick={() => handleEditField(4)}
+                    className="p-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] opacity-45 hover:opacity-100 hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-all flex items-center gap-1 cursor-pointer text-[10px] font-semibold"
+                    title="Editar mentoria"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span>Editar</span>
+                  </button>
+                </div>
+
               </div>
 
               <div className="flex gap-2">
