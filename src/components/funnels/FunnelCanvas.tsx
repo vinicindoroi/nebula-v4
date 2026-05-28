@@ -122,10 +122,26 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     return { x, y };
   };
 
-  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (interactionMode !== 'draw') return;
+    
+    // Only left click draws
+    if (e.button !== 0) return;
+    
+    // Don't draw if clicking on nodes, edges, or overlays
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('.react-flow__node') || 
+      target.closest('.react-flow__edge') || 
+      target.closest('.react-flow__controls') ||
+      target.closest('button') ||
+      target.closest('input')
+    ) {
+      return;
+    }
+    
     e.preventDefault();
-    const coords = getFlowCoords(e);
+    const coords = getFlowCoords(e as any);
     if (!coords) return;
 
     if (isEraserMode) {
@@ -137,10 +153,10 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     }
   };
 
-  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDrawing || interactionMode !== 'draw') return;
     e.preventDefault();
-    const coords = getFlowCoords(e);
+    const coords = getFlowCoords(e as any);
     if (!coords) return;
 
     if (isEraserMode) {
@@ -1381,7 +1397,13 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
 
         {/* React Flow Canvas wrapped in Educational Context */}
         <FunnelEducationalContext.Provider value={{ educationalMode }}>
-          <div ref={reactFlowWrapper} className="h-full">
+          <div 
+            ref={reactFlowWrapper} 
+            className="h-full"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+          >
             <ReactFlow
               nodes={nodes.map((n) => multiConnectSources.includes(n.id) ? { ...n, className: `${n.className || ''} multi-connect-source`.trim() } : n)}
               edges={edges}
@@ -1433,14 +1455,8 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
 
             {/* Freehand drawings SVG layer overlay */}
             <svg 
-              className={cn(
-                "absolute inset-0 z-[5]",
-                interactionMode === 'draw' ? "pointer-events-auto cursor-crosshair" : "pointer-events-none"
-              )}
+              className="absolute inset-0 z-[5] pointer-events-none"
               style={{ width: '100%', height: '100%' }}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
             >
               <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
                 {/* Render finalized drawing paths */}
