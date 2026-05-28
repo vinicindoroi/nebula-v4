@@ -392,7 +392,7 @@ export function FreeTextNode({ data, selected, id }: FreeTextNodeProps) {
           textAlignClass,
           selected && 'outline outline-2 outline-primary/40 outline-offset-4',
           !selected && 'hover:outline hover:outline-1 hover:outline-muted-foreground/20 hover:outline-offset-2',
-          !isEditing && 'cursor-default pointer-events-none'
+          !isEditing && 'cursor-grab active:cursor-grabbing'
         )}
         style={{
           width: nodeWidth,
