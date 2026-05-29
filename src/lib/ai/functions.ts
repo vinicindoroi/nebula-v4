@@ -39,7 +39,7 @@ export interface QuizOutput {
  * Generates a fully typed multiple-choice quiz based on lesson text.
  */
 export const generateQuizFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) => generateQuizSchema.parse(data))
+  .inputValidator((data: unknown) => generateQuizSchema.parse(data))
   .handler(async ({ data }) => {
     const { lessonText, numberOfQuestions } = data;
 
@@ -127,7 +127,7 @@ ${lessonText}`;
  * Creates a premium, comprehensive markdown study summary for students.
  */
 export const summarizeLessonFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) => summarizeLessonSchema.parse(data))
+  .inputValidator((data: unknown) => summarizeLessonSchema.parse(data))
   .handler(async ({ data }) => {
     const { lessonTitle, lessonText } = data;
 
@@ -170,7 +170,7 @@ ${lessonText}`;
  * Contextual fast autocomplete to assist students taking notes in Tiptap.
  */
 export const autocompleteNoteFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) => autocompleteNoteSchema.parse(data))
+  .inputValidator((data: unknown) => autocompleteNoteSchema.parse(data))
   .handler(async ({ data }) => {
     const { noteContext } = data;
 
@@ -201,6 +201,115 @@ export const autocompleteNoteFn = createServerFn({ method: "POST" })
       return {
         success: false,
         error: error.message || "Erro desconhecido ao completar a nota.",
+      };
+    }
+  });
+
+/**
+ * Server Function 4: Analyze Creative Copy (OpenAI Structured Output)
+ * Performs an in-depth copywriting and persuasive structure audit on an ad script.
+ */
+const analyzeCreativeCopySchema = z.object({
+  text: z.string().min(10, "O texto a ser analisado deve ter pelo menos 10 caracteres."),
+});
+
+export interface CreativeAnalysisOutput {
+  confidence: number;
+  formula: string;
+  strengths: string[];
+  weaknesses: string[];
+  structure: {
+    block: string;
+    excerpt: string;
+    purpose: string;
+  }[];
+}
+
+export const analyzeCreativeCopyFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => analyzeCreativeCopySchema.parse(data))
+  .handler(async ({ data }) => {
+    const { text } = data;
+
+    const prompt = `Analise a seguinte copy ou roteiro de anúncio criativo e faça um raio-x completo do seu copywriting.
+Você deve identificar a fórmula ou framework de copy utilizado (ex: AIDA, PAS, Roteiro de 3 Passos), avaliar os pontos fortes e pontos fracos de forma didática, dar uma nota de 0 a 100 para a qualidade geral da copy e mapear a anatomia ou estrutura invisível do anúncio, destacando trechos exatos (excerpts) e o propósito persuasivo de cada bloco.
+
+Copy / Roteiro do Criativo:
+${text}`;
+
+    const creativeAnalysisSchema = {
+      name: "creative_copy_analyzer",
+      description: "Faz um diagnóstico estruturado e profundo de copywriting de um criativo.",
+      schema: {
+        type: "object",
+        properties: {
+          confidence: {
+            type: "number",
+            description: "Nota geral de qualidade da copy de 0 a 100 baseada em poder de conversão."
+          },
+          formula: {
+            type: "string",
+            description: "A fórmula de copy identificada no texto (ex: AIDA, PAS, etc.)."
+          },
+          strengths: {
+            type: "array",
+            description: "Lista de 3 a 5 pontos fortes da copy (por que funciona).",
+            items: { type: "string" }
+          },
+          weaknesses: {
+            type: "array",
+            description: "Lista de 3 a 5 pontos fracos ou oportunidades de melhoria (o que melhorar).",
+            items: { type: "string" }
+          },
+          structure: {
+            type: "array",
+            description: "Mapeamento da anatomia da copy em blocos sequenciais.",
+            items: {
+              type: "object",
+              properties: {
+                block: {
+                  type: "string",
+                  description: "Nome do bloco (ex: Gancho, História, Oferta, CTA)."
+                },
+                excerpt: {
+                  type: "string",
+                  description: "Trecho exato da copy correspondente a este bloco."
+                },
+                purpose: {
+                  type: "string",
+                  description: "O propósito persuasivo deste bloco específico."
+                }
+              },
+              required: ["block", "excerpt", "purpose"],
+              additionalProperties: false
+            }
+          }
+        },
+        required: ["confidence", "formula", "strengths", "weaknesses", "structure"],
+        additionalProperties: false
+      }
+    };
+
+    try {
+      const analysis = await openaiClient.generateStructuredOutput<CreativeAnalysisOutput>(
+        [
+          {
+            role: "system",
+            content: "Você é um Copywriter de Elite e Diretor de Criação de Anúncios de alta conversão. Você analisa roteiros de anúncios e identifica exatamente a estrutura de persuasão científica por trás deles."
+          },
+          { role: "user", content: prompt }
+        ],
+        creativeAnalysisSchema
+      );
+
+      return {
+        success: true,
+        analysis,
+      };
+    } catch (error: any) {
+      console.error("[analyzeCreativeCopyFn] Error auditing creative copy:", error);
+      return {
+        success: false,
+        error: error.message || "Erro desconhecido ao analisar a copy do criativo.",
       };
     }
   });

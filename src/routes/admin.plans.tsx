@@ -207,6 +207,44 @@ async function savePlans(plans: Plan[]) {
   }
 }
 
+const getTheme = (slug: string) => {
+  const s = slug.toLowerCase();
+  if (s.includes("free")) {
+    return {
+      glow: "bg-gradient-to-b from-cyan-500/10 via-cyan-500/5 to-transparent",
+      text: "text-cyan-400",
+      brand: "text-cyan-400/40",
+      buttonBorder: "border-white/10 hover:border-white/20 bg-white/[0.01] hover:bg-white/[0.06] text-white",
+      pill: "bg-cyan-950/30 border-cyan-800/20 text-cyan-400/80",
+    };
+  }
+  if (s.includes("pro")) {
+    return {
+      glow: "bg-gradient-to-b from-violet-600/15 via-violet-600/5 to-transparent",
+      text: "text-violet-400",
+      brand: "text-violet-400/40",
+      buttonBorder: "bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 text-white hover:from-violet-500 hover:to-indigo-600 shadow-[0_8px_24px_-8px_rgba(139,92,246,0.8)]",
+      pill: "bg-violet-950/30 border-violet-800/20 text-violet-400/80",
+    };
+  }
+  return {
+    glow: "bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-transparent",
+    text: "text-amber-400",
+    brand: "text-amber-400/40",
+    buttonBorder: "border-amber-500/30 hover:border-amber-500/60 bg-amber-500/5 hover:bg-amber-500/10 text-amber-300 hover:text-white shadow-[0_4px_12px_rgba(245,158,11,0.05)]",
+    pill: "bg-amber-950/30 border-amber-800/20 text-amber-400/80",
+  };
+};
+
+function PlanCheckItem({ children, color = "text-primary" }: { children: React.ReactNode; color?: string }) {
+  return (
+    <li className="flex items-start gap-2.5 text-xs text-white/60 leading-relaxed font-medium">
+      <Check className={`h-4 w-4 ${color} shrink-0 mt-0.5`} />
+      <span>{children}</span>
+    </li>
+  );
+}
+
 function Page() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [editing, setEditing] = useState<Partial<Plan> | null>(null);
@@ -237,56 +275,110 @@ function Page() {
         </div>
         <button
           onClick={() => setEditing({})}
-          className="gradient-primary text-primary-foreground px-3.5 py-2 rounded-xl text-sm flex items-center gap-2 shadow-[0_8px_24px_-8px_oklch(0.65_0.22_290/0.6)]"
+          className="gradient-primary text-primary-foreground px-3.5 py-2 rounded-xl text-sm flex items-center gap-2 shadow-[0_8px_24px_-8px_oklch(0.65_0.22_290/0.6)] cursor-pointer"
         >
           <Plus className="h-4 w-4" />Novo plano
         </button>
       </div>
 
       {/* Plans grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {plans.map((p) => (
-          <div key={p.id} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 hover:border-white/10 transition group">
-            <div className="flex items-start justify-between gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Package className="h-5 w-5 text-primary" />
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {plans.map((p) => {
+          const theme = getTheme(p.slug);
+          return (
+            <div
+              key={p.id}
+              className="group relative rounded-2xl overflow-hidden border border-white/[0.08] bg-white/[0.02] backdrop-blur p-6 flex flex-col h-full min-h-[520px] transition-all duration-300 hover:scale-[1.02] hover:border-white/15"
+              style={{
+                boxShadow: "0 4px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06)",
+              }}
+            >
+              {/* Top Glow Accent */}
+              <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-4/5 h-28 ${theme.glow} blur-[32px] rounded-full pointer-events-none`} />
+
+              {/* Status Badge */}
+              <div className={`absolute top-4 left-4 z-20 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/60 border text-[9px] font-bold uppercase tracking-widest shadow-lg ${p.is_active ? "border-emerald-500/30 text-emerald-400" : "border-white/10 text-white/50"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${p.is_active ? "bg-emerald-400 animate-pulse" : "bg-white/20"}`} />
+                {p.is_active ? "Ativo" : "Inativo"}
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                <button onClick={() => setEditing(p)} className="p-1.5 rounded-lg hover:bg-white/10">
+
+              {/* Edit/Delete Actions */}
+              <div className="absolute top-4 right-4 z-20 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                <button onClick={() => setEditing(p)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white cursor-pointer transition">
                   <Edit3 className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => remove(p.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400">
+                <button onClick={() => remove(p.id)} className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 cursor-pointer transition">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
+
+              {/* Header */}
+              <div className="text-center mt-6">
+                <span className={`text-[9px] font-extrabold uppercase tracking-[0.25em] ${theme.brand}`}>NEBULA.HUB</span>
+                <h3 className="text-2xl font-black text-white tracking-tight mt-1">{p.name}</h3>
+              </div>
+
+              {/* Price & Primary limits */}
+              <div className="text-center my-6 flex flex-col items-center">
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-5xl font-black text-white tracking-tight">
+                    {p.price > 0 ? `R$ ${p.price}` : "R$ 0"}
+                  </span>
+                  {p.price > 0 && p.billing_period && (
+                    <span className="text-xs text-white/40 font-medium">/{p.billing_period}</span>
+                  )}
+                </div>
+                {p.price === 0 && <span className="text-xs text-white/40 font-semibold mt-1">acesso vitalício</span>}
+                <span className={`text-[10px] font-bold mt-3 ${theme.pill} px-3 py-1 rounded-full inline-block`}>
+                  {p.features.max_courses === 999 || p.features.max_courses > 100 ? "Cursos ilimitados" : `${p.features.max_courses} cursos liberados`}
+                </span>
+              </div>
+
+              <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent my-4" />
+
+              {/* Bullet list of features */}
+              <ul className="space-y-3 px-1 mb-6">
+                <PlanCheckItem color={theme.text}>
+                  {p.features.max_courses === 999 || p.features.max_courses > 100 ? "Cursos ilimitados" : `${p.features.max_courses} cursos de faturamento`}
+                </PlanCheckItem>
+                <PlanCheckItem color={theme.text}>
+                  {p.features.max_modules === 999 || p.features.max_modules > 100 ? "Módulos ilimitados" : `${p.features.max_modules} módulos inclusos`}
+                </PlanCheckItem>
+                <PlanCheckItem color={theme.text}>
+                  {p.features.max_members === 9999 || p.features.max_members > 5000 ? "Membros ilimitados" : `${p.features.max_members} membros permitidos`}
+                </PlanCheckItem>
+                <PlanCheckItem color={theme.text}>
+                  {p.features.max_posts_per_day === 999 ? "Posts diários ilimitados" : `${p.features.max_posts_per_day} posts diários no fórum`}
+                </PlanCheckItem>
+                
+                {/* Dynamic boolean features */}
+                {p.features.funnels_access && (
+                  <PlanCheckItem color={theme.text}>Visual Funnel Builder</PlanCheckItem>
+                )}
+                {p.features.organizer_access && (
+                  <PlanCheckItem color={theme.text}>Organizador Trello (Kanban)</PlanCheckItem>
+                )}
+                {p.features.notes_access && (
+                  <PlanCheckItem color={theme.text}>Notas Tiptap com IA Híbrida</PlanCheckItem>
+                )}
+                {p.features.custom_domain && (
+                  <PlanCheckItem color={theme.text}>Domínio customizado do aluno</PlanCheckItem>
+                )}
+                {p.features.api_access && (
+                  <PlanCheckItem color={theme.text}>Acesso completo à API do Hub</PlanCheckItem>
+                )}
+              </ul>
+
+              {/* Edit CTA button resembling public cards but as a manage button */}
+              <button
+                onClick={() => setEditing(p)}
+                className={`w-full py-3 px-4 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-auto border ${theme.buttonBorder}`}
+              >
+                Gerenciar Plano <Edit3 className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <h3 className="font-medium mt-3 leading-tight">{p.name}</h3>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-lg font-bold text-emerald-400">
-                {p.price > 0 ? `R$ ${p.price.toFixed(2)}` : "Grátis"}
-              </span>
-              {p.billing_period && p.price > 0 && (
-                <span className="text-xs text-muted-foreground">/{p.billing_period}</span>
-              )}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">
-                {p.features.max_courses} cursos
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/10 text-purple-400">
-                {p.features.max_members} membros
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">
-                {p.features.max_posts_per_day} posts/dia
-              </span>
-            </div>
-            <div className="mt-2">
-              <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${p.is_active ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-muted-foreground"}`}>
-                {p.is_active ? "Ativo" : "Inativo"}
-              </span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {plans.length === 0 && (
           <div className="col-span-full rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-12 text-center">
             <Package className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />

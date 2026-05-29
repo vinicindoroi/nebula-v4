@@ -33,6 +33,7 @@ import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
 import { Route as AdminCommunityRouteImport } from './routes/admin.community'
 import { Route as AdminCommentsRouteImport } from './routes/admin.comments'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
+import { Route as AppTranscriptRouteImport } from './routes/_app.transcript'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSavedRouteImport } from './routes/_app.saved'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
@@ -164,6 +165,11 @@ const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => AdminRoute,
 } as any)
+const AppTranscriptRoute = AppTranscriptRouteImport.update({
+  id: '/transcript',
+  path: '/transcript',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -237,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AppProfileRoute
   '/saved': typeof AppSavedRoute
   '/settings': typeof AppSettingsRoute
+  '/transcript': typeof AppTranscriptRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/community': typeof AdminCommunityRoute
@@ -273,6 +280,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AppProfileRoute
   '/saved': typeof AppSavedRoute
   '/settings': typeof AppSettingsRoute
+  '/transcript': typeof AppTranscriptRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/community': typeof AdminCommunityRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/_app/profile': typeof AppProfileRoute
   '/_app/saved': typeof AppSavedRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/transcript': typeof AppTranscriptRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/community': typeof AdminCommunityRoute
@@ -349,6 +358,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/saved'
     | '/settings'
+    | '/transcript'
     | '/admin/categories'
     | '/admin/comments'
     | '/admin/community'
@@ -385,6 +395,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/saved'
     | '/settings'
+    | '/transcript'
     | '/admin/categories'
     | '/admin/comments'
     | '/admin/community'
@@ -422,6 +433,7 @@ export interface FileRouteTypes {
     | '/_app/profile'
     | '/_app/saved'
     | '/_app/settings'
+    | '/_app/transcript'
     | '/admin/categories'
     | '/admin/comments'
     | '/admin/community'
@@ -622,6 +634,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCategoriesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/_app/transcript': {
+      id: '/_app/transcript'
+      path: '/transcript'
+      fullPath: '/transcript'
+      preLoaderRoute: typeof AppTranscriptRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -725,6 +744,7 @@ interface AppRouteChildren {
   AppProfileRoute: typeof AppProfileRoute
   AppSavedRoute: typeof AppSavedRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppTranscriptRoute: typeof AppTranscriptRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -738,6 +758,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppProfileRoute: AppProfileRoute,
   AppSavedRoute: AppSavedRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppTranscriptRoute: AppTranscriptRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

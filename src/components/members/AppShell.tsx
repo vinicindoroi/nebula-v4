@@ -2,7 +2,7 @@ import { Link, useRouterState, Outlet, useNavigate } from "@tanstack/react-route
 import {
   LayoutDashboard, GraduationCap, Users, User, Settings, Search, Bell,
   Menu, X, Orbit, LogOut, Shield, MessageSquare, Bookmark, GitBranch,
-  PanelLeftClose, PanelLeftOpen, StickyNote, HelpCircle, Trello,
+  PanelLeftClose, PanelLeftOpen, StickyNote, HelpCircle, Trello, Mic,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,6 +33,7 @@ const navGroups: NavGroup[] = [
       { to: "/saved", label: "Salvos", icon: Bookmark },
       { to: "/notes", label: "Notas", icon: StickyNote },
       { to: "/funnels", label: "Funis", icon: GitBranch },
+      { to: "/transcript", label: "Transcrição", icon: Mic },
     ],
   },
   {
