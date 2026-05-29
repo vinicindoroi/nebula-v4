@@ -206,7 +206,65 @@ export const autocompleteNoteFn = createServerFn({ method: "POST" })
   });
 
 /**
- * Server Function 4: Analyze Creative Copy (OpenAI Structured Output)
+ * Server Function 4: Transcribe Audio (OpenAI Whisper API)
+ * Accepts base64-encoded audio/video and returns the transcribed text.
+ */
+const transcribeAudioSchema = z.object({
+  base64Data: z.string().min(1),
+  mimeType: z.string().min(1),
+  fileName: z.string().min(1),
+});
+
+export const transcribeAudioFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => transcribeAudioSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { base64Data, mimeType, fileName } = data;
+    const apiKey = import.meta.env?.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return { success: false, error: "OpenAI API key não configurada." };
+    }
+
+    try {
+      // Reconstruct the binary file from base64
+      const binaryStr = atob(base64Data);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+
+      const formData = new FormData();
+      formData.append("file", blob, fileName);
+      formData.append("model", "whisper-1");
+      formData.append("response_format", "verbose_json");
+
+      const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Whisper API Error (${response.status}): ${err}`);
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        text: result.text as string,
+        language: result.language as string,
+        duration: result.duration as number,
+      };
+    } catch (error: any) {
+      console.error("[transcribeAudioFn] Error:", error);
+      return { success: false, error: error.message || "Erro ao transcrever áudio." };
+    }
+  });
+
+/**
+ * Server Function 5: Analyze Creative Copy (OpenAI Structured Output)
  * Performs an in-depth copywriting and persuasive structure audit on an ad script.
  */
 const analyzeCreativeCopySchema = z.object({
