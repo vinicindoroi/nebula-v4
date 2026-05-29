@@ -57,6 +57,92 @@ export function AppShell() {
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
+  const [userPlanFeatures, setUserPlanFeatures] = useState<any>(null);
+
+  const fallbackFeatures = {
+    courses_access: true,
+    community_access: true,
+    forum_access: true,
+    organizer_access: true,
+    notes_access: true,
+    funnels_access: true,
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    const loadUserPlan = async () => {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("plan")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        const userPlanSlug = (profile?.plan || "Free").toLowerCase();
+
+        const { data: settings } = await supabase
+          .from("app_settings" as any)
+          .select("value")
+          .eq("key", "plans_config")
+          .maybeSingle();
+
+        const plans = settings?.value as any[];
+        
+        let foundFeatures = null;
+        if (plans && Array.isArray(plans)) {
+          const userPlan = plans.find(p => p.slug.toLowerCase() === userPlanSlug) || plans.find(p => p.slug.toLowerCase() === "free");
+          if (userPlan) foundFeatures = userPlan.features;
+        }
+
+        if (!foundFeatures) {
+          if (userPlanSlug === "free") {
+            foundFeatures = { courses_access: true, community_access: true, forum_access: true, organizer_access: true, notes_access: true, funnels_access: false };
+          } else {
+            foundFeatures = { courses_access: true, community_access: true, forum_access: true, organizer_access: true, notes_access: true, funnels_access: true };
+          }
+        }
+
+        setUserPlanFeatures(foundFeatures);
+      } catch (err) {
+        console.error("Error loading user plan features:", err);
+        setUserPlanFeatures(fallbackFeatures);
+      }
+    };
+    loadUserPlan();
+  }, [user]);
+
+  const filteredNavGroups = useMemo(() => {
+    const features = userPlanFeatures || fallbackFeatures;
+
+    return navGroups.map(group => {
+      const items = group.items.filter(item => {
+        if (item.to === "/organizer" && features.organizer_access === false) return false;
+        if (item.to === "/courses" && features.courses_access === false) return false;
+        if (item.to === "/community" && features.community_access === false) return false;
+        if (item.to === "/forum" && features.forum_access === false) return false;
+        if (item.to === "/notes" && features.notes_access === false) return false;
+        if (item.to === "/funnels" && features.funnels_access === false) return false;
+        return true;
+      });
+      return { ...group, items };
+    }).filter(group => group.items.length > 0);
+  }, [userPlanFeatures]);
+
+  const allNav = useMemo(() => {
+    return filteredNavGroups.flatMap((g) => g.items);
+  }, [filteredNavGroups]);
+
+  const hasAccess = useMemo(() => {
+    const features = userPlanFeatures || fallbackFeatures;
+    if (path === "/organizer" && features.organizer_access === false) return false;
+    if (path === "/courses" && features.courses_access === false) return false;
+    if (path === "/community" && features.community_access === false) return false;
+    if (path === "/forum" && features.forum_access === false) return false;
+    if (path === "/notes" && features.notes_access === false) return false;
+    if (path === "/funnels" && features.funnels_access === false) return false;
+    return true;
+  }, [path, userPlanFeatures]);
+
   usePresence();
 
   // Auto-show tutorial on first visit
@@ -250,7 +336,7 @@ export function AppShell() {
           </div>
 
           <nav className="flex-1 overflow-y-auto -mx-1 px-1 space-y-5">
-            {navGroups.map((group) => (
+            {filteredNavGroups.map((group) => (
               <div key={group.label}>
                 <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                   {group.label}
@@ -339,7 +425,7 @@ export function AppShell() {
             </div>
           </Link>
           <nav className="flex-1 overflow-y-auto space-y-5">
-            {navGroups.map((group) => (
+            {filteredNavGroups.map((group) => (
               <div key={group.label}>
                 <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{group.label}</div>
                 <div className="space-y-0.5">
@@ -408,13 +494,48 @@ export function AppShell() {
         )}
         <main className={`flex-1 ${isFunnelsPage ? 'p-0 overflow-hidden' : 'px-4 md:px-8 py-6 md:py-8'}`}>
           <div key={path} className={isFunnelsPage ? 'h-full' : 'admin-route-slot'}>
-            <Outlet />
+            {hasAccess ? (
+              <Outlet />
+            ) : (
+              <PlanLockScreen />
+            )}
           </div>
         </main>
       </div>
 
       {/* Tutorial Wizard */}
       <TutorialWizard open={showTutorial} onClose={handleCloseTutorial} />
+    </div>
+  );
+}
+
+function PlanLockScreen() {
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto space-y-5 animate-fade-in relative z-10">
+      <div className="absolute inset-0 bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      <div className="h-16 w-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[0_0_30px_oklch(0.65_0.22_290/0.2)] mb-2">
+        <Shield className="h-8 w-8 stroke-[1.5]" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">Recurso Premium</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Esta funcionalidade não está disponível no seu plano atual. Faça upgrade para continuar evoluindo na sua jornada.
+        </p>
+      </div>
+      <div className="pt-2 flex flex-col gap-2 w-full">
+        <Link
+          to="/settings"
+          className="w-full inline-flex items-center justify-center gradient-primary text-primary-foreground py-2.5 rounded-xl text-sm font-semibold transition hover:scale-[1.01] shadow-[0_8px_24px_-8px_oklch(0.65_0.22_290/0.4)] cursor-pointer"
+        >
+          Ver Upgrade de Planos
+        </Link>
+        <Link
+          to="/profile"
+          className="w-full inline-flex items-center justify-center bg-white/5 border border-white/10 hover:bg-white/10 text-foreground py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer"
+        >
+          Voltar ao Meu Perfil
+        </Link>
+      </div>
     </div>
   );
 }

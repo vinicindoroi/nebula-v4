@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   Plus, Edit3, Trash2, Package, Crown, Zap, Users, BookOpen,
-  Layers, GitFork, MessageSquare, BarChart3, Shield, Check,
+  Layers, GitFork, MessageSquare, BarChart3, Shield, Check, Trello, StickyNote
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,6 +35,11 @@ type PlanFeatures = {
   custom_domain: boolean;
   analytics_access: boolean;
   api_access: boolean;
+  courses_access: boolean;
+  forum_access: boolean;
+  organizer_access: boolean;
+  notes_access: boolean;
+  funnels_access: boolean;
 };
 
 const DEFAULT_FEATURES: PlanFeatures = {
@@ -51,6 +56,11 @@ const DEFAULT_FEATURES: PlanFeatures = {
   custom_domain: false,
   analytics_access: false,
   api_access: false,
+  courses_access: true,
+  forum_access: true,
+  organizer_access: true,
+  notes_access: true,
+  funnels_access: false,
 };
 
 const ALL_CATEGORIES = [
@@ -64,8 +74,13 @@ const ALL_FUNNEL_TYPES = [
 ];
 
 const FEATURE_LABELS: Record<string, { label: string; icon: typeof Zap }> = {
-  community_access: { label: "Comunidade", icon: MessageSquare },
-  comments_access: { label: "Comentários", icon: MessageSquare },
+  courses_access: { label: "Acesso a Cursos (LMS)", icon: BookOpen },
+  community_access: { label: "Acesso a Comunidade", icon: Users },
+  forum_access: { label: "Acesso ao Fórum", icon: MessageSquare },
+  organizer_access: { label: "Acesso ao Organizador (Trello)", icon: Trello },
+  notes_access: { label: "Acesso a Notas (Tiptap)", icon: StickyNote },
+  funnels_access: { label: "Acesso a Funis (Builder)", icon: GitFork },
+  comments_access: { label: "Comentários no LMS", icon: MessageSquare },
   notifications_custom: { label: "Notificações customizadas", icon: Zap },
   priority_support: { label: "Suporte prioritário", icon: Shield },
   custom_domain: { label: "Domínio customizado", icon: Crown },
@@ -96,6 +111,11 @@ const DEFAULT_PLANS: Plan[] = [
       custom_domain: false,
       analytics_access: false,
       api_access: false,
+      courses_access: true,
+      forum_access: true,
+      organizer_access: true,
+      notes_access: true,
+      funnels_access: false,
     },
   },
   {
@@ -120,6 +140,11 @@ const DEFAULT_PLANS: Plan[] = [
       custom_domain: false,
       analytics_access: true,
       api_access: false,
+      courses_access: true,
+      forum_access: true,
+      organizer_access: true,
+      notes_access: true,
+      funnels_access: true,
     },
   },
   {
@@ -144,6 +169,11 @@ const DEFAULT_PLANS: Plan[] = [
       custom_domain: true,
       analytics_access: true,
       api_access: true,
+      courses_access: true,
+      forum_access: true,
+      organizer_access: true,
+      notes_access: true,
+      funnels_access: true,
     },
   },
 ];

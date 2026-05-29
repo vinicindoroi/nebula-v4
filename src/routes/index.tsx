@@ -2,9 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Orbit, GraduationCap, ArrowRight, Play, Users, Target,
   MessageSquare, Zap, CheckCircle2, Rocket, Crown,
-  Unlock, Flame, Star, Shield, ChevronDown, Trophy
+  Unlock, Flame, Star, Shield, ChevronDown, Trophy, Check
 } from "lucide-react";
 import { useRef, useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
@@ -1040,91 +1042,203 @@ function RevenueCalculator() {
 /* ─── Plans ─── */
 function PlansSection() {
   const { ref, isVisible } = useScrollReveal();
+  const { user } = useAuth();
+  const [currentPlan, setCurrentPlan] = useState<string>("free");
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchUserPlan = async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("plan")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (data?.plan) {
+          setCurrentPlan(data.plan.toLowerCase());
+        }
+      } catch (_) {}
+    };
+    fetchUserPlan();
+  }, [user]);
+
+  const targetLink = user ? "/settings" : "/login";
+
   return (
     <section id="planos" ref={ref} className="relative z-10 px-5 pb-32 max-w-5xl mx-auto">
       <SectionHeader title="Escolha seu ritmo. O resultado é inevitável." subtitle="Não importa onde você está hoje — existe um plano sob medida para o seu momento de escala." isVisible={isVisible} />
-      <div className="grid lg:grid-cols-3 gap-5 mt-14">
+      <div className="grid lg:grid-cols-3 gap-6 mt-14">
+        
+        {/* PLANO 1: FREE / STARTER STYLE */}
         <GlowCard delay={0} isVisible={isVisible}>
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20"><Unlock className="h-5 w-5 text-emerald-400" /></div>
-              <div><h3 className="text-sm font-bold text-white">Gratuito</h3><span className="text-[10px] uppercase tracking-wider text-emerald-400/80">Primeiro passo</span></div>
-            </div>
-            <p className="text-xs text-white/45 leading-relaxed mb-5">Para quem está cansado de girar em círculos e deseja experimentar a metodologia com risco zero e resultados reais.</p>
+          <div className="flex flex-col h-full relative py-2 min-h-[500px]">
+            {/* Top Cyan Glow Accent */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4/5 h-28 bg-gradient-to-b from-cyan-500/10 via-cyan-500/5 to-transparent blur-[32px] rounded-full pointer-events-none" />
             
-            <div className="my-5 flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-white">R$ 0</span>
-              <span className="text-[10px] text-white/40">/ acesso vitalício</span>
+            {currentPlan === "free" && (
+              <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/60 border border-emerald-500/30 text-[9px] font-bold text-emerald-400 uppercase tracking-widest shadow-lg">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Atual
+              </div>
+            )}
+            
+            <div className="text-center mt-4">
+              <span className="text-[9px] font-extrabold uppercase tracking-[0.25em] text-cyan-400/40">NEBULA.HUB</span>
+              <h3 className="text-2xl font-black text-white tracking-tight mt-1">Free</h3>
             </div>
 
-            <ul className="space-y-2.5 mt-auto">
-              <PlanItem>Aulas fundamentais que geram resultado rápido</PlanItem>
-              <PlanItem>Acesso à comunidade de membros</PlanItem>
-              <PlanItem>Fórum integrado para solução de dúvidas</PlanItem>
-              <PlanItem>Método validado para destravar os primeiros R$</PlanItem>
+            <div className="text-center my-6 flex flex-col items-center">
+              <div className="flex items-baseline gap-1">
+                <span className="text-5xl font-black text-white tracking-tight">R$ 0</span>
+              </div>
+              <span className="text-xs text-white/40 font-semibold mt-1">acesso vitalício</span>
+              <span className="text-[10px] font-bold text-cyan-400/90 mt-3 bg-cyan-950/40 border border-cyan-800/30 px-3 py-1 rounded-full inline-block">
+                2 cursos liberados
+              </span>
+            </div>
+
+            <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent my-4" />
+
+            <ul className="space-y-3.5 px-2 mb-4">
+              <PlanCheckItem color="text-cyan-400">2 cursos e 5 módulos essenciais</PlanCheckItem>
+              <PlanCheckItem color="text-cyan-400">Acesso à comunidade de membros</PlanCheckItem>
+              <PlanCheckItem color="text-cyan-400">Fórum prático para solução de dúvidas</PlanCheckItem>
+              <PlanCheckItem color="text-cyan-400">Aulas estruturadas com tarefas de fixação</PlanCheckItem>
+              <span className="text-[10px] text-white/30 italic block mt-2 ml-7">+ 2 recursos essenciais</span>
             </ul>
 
-            <Link to="/login" search={{ mode: "signup" }} className="w-full mt-6 py-3 px-4 rounded-xl text-center text-xs font-semibold border border-white/[0.08] hover:bg-white/[0.05] text-white/80 hover:text-white transition-all">
-              Começar Gratuitamente
+            <button className="text-[10px] text-white/40 hover:text-white/60 transition-all font-bold flex items-center justify-center gap-1 mx-auto mt-4 mb-6">
+              Ver tudo que está incluso <ChevronDown className="h-3 w-3" />
+            </button>
+
+            <Link 
+              to={targetLink} 
+              search={user ? undefined : { mode: "signup" }} 
+              className="w-full py-3 px-4 rounded-xl text-center text-xs font-bold border border-white/10 bg-white/[0.01] hover:bg-white/[0.06] hover:border-white/20 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-auto"
+            >
+              Começar Agora <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </GlowCard>
 
+        {/* PLANO 2: PRO / PRO STYLE */}
         <GlowCard delay={150} isVisible={isVisible} featured>
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-primary/10 border border-primary/20"><Flame className="h-5 w-5 text-primary" /></div>
-              <div><h3 className="text-sm font-bold text-white">Premium</h3><span className="text-[10px] uppercase tracking-wider text-primary/80">Mais escolhido</span></div>
-            </div>
-            <p className="text-xs text-white/45 leading-relaxed mb-5">Você já sabe que funciona. Agora busca consistência, automação e escala real para transformar conhecimento em um negócio.</p>
+          <div className="flex flex-col h-full relative py-2 min-h-[500px]">
+            {/* Top Purple Glow Accent */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4/5 h-28 bg-gradient-to-b from-violet-600/15 via-violet-600/5 to-transparent blur-[32px] rounded-full pointer-events-none" />
             
-            <div className="my-5 flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-white">R$ 97</span>
-              <span className="text-[10px] text-white/40">/ mensal</span>
+            {currentPlan === "pro" && (
+              <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/60 border border-emerald-500/30 text-[9px] font-bold text-emerald-400 uppercase tracking-widest shadow-lg">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Atual
+              </div>
+            )}
+            
+            <div className="text-center mt-4">
+              <span className="text-[9px] font-extrabold uppercase tracking-[0.25em] text-violet-400/40">NEBULA.HUB</span>
+              <h3 className="text-2xl font-black text-white tracking-tight mt-1">Pro</h3>
             </div>
 
-            <ul className="space-y-2.5 mt-auto">
-              <PlanItem>Tudo do Gratuito +</PlanItem>
-              <PlanItem>Módulos de escala, automação de funis</PlanItem>
-              <PlanItem>Estratégias de tráfego de alta conversão</PlanItem>
-              <PlanItem>Templates prontos de cópias e automações</PlanItem>
-              <PlanItem>Aulas práticas novas adicionadas semanalmente</PlanItem>
+            <div className="text-center my-6 flex flex-col items-center">
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-5xl font-black text-white tracking-tight">R$ 97</span>
+                <span className="text-xs text-white/40 font-medium">/ mês</span>
+              </div>
+              <span className="text-xs text-white/40 font-semibold mt-1">cobrado mensalmente</span>
+              <span className="text-[10px] font-bold text-violet-400/90 mt-3 bg-violet-950/40 border border-violet-800/30 px-3 py-1 rounded-full inline-block">
+                10 cursos & Kanban
+              </span>
+            </div>
+
+            <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent my-4" />
+
+            <ul className="space-y-3.5 px-2 mb-4">
+              <PlanCheckItem color="text-violet-400">Todos os recursos do Free</PlanCheckItem>
+              <PlanCheckItem color="text-violet-400">10 cursos e 50 módulos inclusos</PlanCheckItem>
+              <PlanCheckItem color="text-violet-400">Acesso total ao Organizador (Kanban)</PlanCheckItem>
+              <PlanCheckItem color="text-violet-400">Acesso ao Notas Tiptap com IA Híbrida</PlanCheckItem>
+              <span className="text-[10px] text-white/30 italic block mt-2 ml-7">+ 3 recursos adicionais</span>
             </ul>
 
-            <Link to="/login" search={{ mode: "signup" }} className="w-full mt-6 py-3 px-4 rounded-xl text-center text-xs font-semibold gradient-primary text-white shadow-[0_4px_16px_oklch(0.65_0.22_290/0.4)] hover:scale-[1.02] transition-all btn-glow">
-              Escalar com Premium
+            <button className="text-[10px] text-white/40 hover:text-white/60 transition-all font-bold flex items-center justify-center gap-1 mx-auto mt-4 mb-6">
+              Ver tudo que está incluso <ChevronDown className="h-3 w-3" />
+            </button>
+
+            <Link 
+              to={targetLink} 
+              search={user ? undefined : { mode: "signup" }} 
+              className="w-full py-3.5 px-4 rounded-xl text-center text-xs font-bold bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-600 text-white shadow-[0_8px_24px_-8px_rgba(139,92,246,0.8)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-auto btn-glow"
+            >
+              Começar Agora <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </GlowCard>
 
+        {/* PLANO 3: PREMIUM / CREATOR STYLE */}
         <GlowCard delay={300} isVisible={isVisible}>
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-amber-500/10 border border-amber-500/20"><Crown className="h-5 w-5 text-amber-400" /></div>
-              <div><h3 className="text-sm font-bold text-white">VIP</h3><span className="text-[10px] uppercase tracking-wider text-amber-400/80">Atalho direto</span></div>
-            </div>
-            <p className="text-xs text-white/45 leading-relaxed mb-5">Para quem não tem tempo a perder. Acompanhamento sob medida para destravar gargalos estratégicos e acelerar seu rumo aos 6 dígitos.</p>
+          <div className="flex flex-col h-full relative py-2 min-h-[500px]">
+            {/* Top Gold Glow Accent */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4/5 h-28 bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-transparent blur-[32px] rounded-full pointer-events-none" />
             
-            <div className="my-5 flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-white">R$ 497</span>
-              <span className="text-[10px] text-white/40">/ mensal</span>
+            {currentPlan === "premium" && (
+              <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/60 border border-emerald-500/30 text-[9px] font-bold text-emerald-400 uppercase tracking-widest shadow-lg">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Atual
+              </div>
+            )}
+            
+            <div className="text-center mt-4">
+              <span className="text-[9px] font-extrabold uppercase tracking-[0.25em] text-amber-400/40">NEBULA.HUB</span>
+              <h3 className="text-2xl font-black text-white tracking-tight mt-1">Premium</h3>
             </div>
 
-            <ul className="space-y-2.5 mt-auto">
-              <PlanItem>Tudo do Premium +</PlanItem>
-              <PlanItem>Mentoria individualizada 1:1</PlanItem>
-              <PlanItem>Canais diretos de suporte estratégico</PlanItem>
-              <PlanItem>Análise crítica de funis e tráfego ativa</PlanItem>
-              <PlanItem>Acesso prioritário a eventos e masterclasses</PlanItem>
+            <div className="text-center my-6 flex flex-col items-center">
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-5xl font-black text-white tracking-tight">R$ 197</span>
+                <span className="text-xs text-white/40 font-medium">/ mês</span>
+              </div>
+              <span className="text-xs text-white/40 font-semibold mt-1">cobrado mensalmente</span>
+              <span className="text-[10px] font-bold text-amber-400/90 mt-3 bg-amber-950/40 border border-amber-800/30 px-3 py-1 rounded-full inline-block">
+                Cursos ilimitados & Funis
+              </span>
+            </div>
+
+            <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent my-4" />
+
+            <ul className="space-y-3.5 px-2 mb-4">
+              <PlanCheckItem color="text-amber-400">Todos os recursos do Pro</PlanCheckItem>
+              <PlanCheckItem color="text-amber-400">Cursos e módulos ilimitados (acesso total)</PlanCheckItem>
+              <PlanCheckItem color="text-amber-400">Acesso ao Visual Funnel Builder (Funis)</PlanCheckItem>
+              <PlanCheckItem color="text-amber-400">Domínio customizado e Analytics Avançado</PlanCheckItem>
+              <span className="text-[10px] text-white/30 italic block mt-2 ml-7">+ 4 recursos adicionais</span>
             </ul>
 
-            <a href="https://wa.me/5599999999999?text=Quero%20saber%20mais%20sobre%20a%20Mentoria%20VIP%20Nebula" target="_blank" rel="noopener noreferrer" className="w-full mt-6 py-3 px-4 rounded-xl text-center text-xs font-semibold border border-amber-500/30 hover:border-amber-500/60 bg-amber-500/5 hover:bg-amber-500/10 text-amber-300 hover:text-white transition-all block">
-              Falar com o Mentor
-            </a>
+            <button className="text-[10px] text-white/40 hover:text-white/60 transition-all font-bold flex items-center justify-center gap-1 mx-auto mt-4 mb-6">
+              Ver tudo que está incluso <ChevronDown className="h-3 w-3" />
+            </button>
+
+            <Link 
+              to={targetLink} 
+              className="w-full py-3 px-4 rounded-xl text-center text-xs font-bold border border-amber-500/30 hover:border-amber-500/60 bg-amber-500/5 hover:bg-amber-500/10 text-amber-300 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_4px_12px_rgba(245,158,11,0.05)] mt-auto"
+            >
+              <Zap className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> Renovar Plano
+            </Link>
+            <span className="text-[9px] text-white/30 text-center block mt-3 font-medium">
+              Acesso total à API • suporte prioritário de elite
+            </span>
           </div>
         </GlowCard>
       </div>
     </section>
+  );
+}
+
+function PlanCheckItem({ children, color = "text-primary" }: { children: React.ReactNode; color?: string }) {
+  return (
+    <li className="flex items-start gap-2.5 text-xs text-white/60 leading-relaxed font-medium">
+      <Check className={`h-4 w-4 ${color} shrink-0 mt-0.5`} />
+      <span>{children}</span>
+    </li>
   );
 }
 

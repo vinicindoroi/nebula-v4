@@ -2484,13 +2484,13 @@ function KanbanCard({ task, columnColor, onMove, onDelete, onDragStart, onDragEn
         </div>
 
         {/* Title */}
-        <h4 className="text-xs font-bold text-foreground leading-snug tracking-tight group-hover:text-primary transition-colors duration-200">
+        <h4 className="text-xs font-bold text-foreground leading-snug tracking-tight group-hover:text-primary transition-colors duration-200 break-words break-all whitespace-pre-wrap">
           {task.title}
         </h4>
         
         {/* Description */}
         {task.description && (
-          <p className="text-[10px] text-muted-foreground/75 leading-relaxed font-normal mt-1.5 mb-2">
+          <p className="text-[10px] text-muted-foreground/75 leading-relaxed font-normal mt-1.5 mb-2 break-words break-all whitespace-pre-wrap overflow-hidden">
             {task.description}
           </p>
         )}
@@ -2530,7 +2530,7 @@ function KanbanCard({ task, columnColor, onMove, onDelete, onDragStart, onDragEn
                       onChange={() => onToggleSubtask(task.id, st.id)}
                       className="mt-0.5 rounded border-white/10 bg-white/[0.02] text-primary focus:ring-primary/20 accent-primary shrink-0 cursor-pointer h-3 w-3"
                     />
-                    <span className={`transition-all duration-200 ${st.completed ? "line-through text-muted-foreground/45 italic" : ""}`}>
+                    <span className={`transition-all duration-200 ${st.completed ? "line-through text-muted-foreground/45 italic" : ""} break-words break-all whitespace-pre-wrap`}>
                       {st.text}
                     </span>
                   </label>

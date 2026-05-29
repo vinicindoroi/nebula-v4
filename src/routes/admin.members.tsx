@@ -17,6 +17,7 @@ function Page() {
   const [planFilter, setPlanFilter] = useState("all");
   const [editing, setEditing] = useState<Member | null>(null);
   const [adding, setAdding] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +50,46 @@ function Page() {
     load();
   };
 
+  const bulkUpdatePlan = async (plan: string) => {
+    setLoading(true);
+    const { error } = await supabase.from("profiles").update({ plan }).in("id", selectedIds);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(`Plano atualizado para ${selectedIds.length} membros!`);
+      setSelectedIds([]);
+      load();
+    }
+    setLoading(false);
+  };
+
+  const bulkUpdateStatus = async (status: string) => {
+    setLoading(true);
+    const { error } = await supabase.from("profiles").update({ status }).in("id", selectedIds);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(`Status atualizado para ${selectedIds.length} membros!`);
+      setSelectedIds([]);
+      load();
+    }
+    setLoading(false);
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`Excluir os ${selectedIds.length} membros selecionados? Esta ação não pode ser desfeita.`)) return;
+    setLoading(true);
+    const { error } = await supabase.from("profiles").delete().in("id", selectedIds);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(`${selectedIds.length} membros excluídos com sucesso!`);
+      setSelectedIds([]);
+      load();
+    }
+    setLoading(false);
+  };
+
   const exportCsv = () => {
     const head = "Nome,Plano,Status,Cadastro\n";
     const body = filtered.map((r) => `"${r.full_name ?? ""}","${r.plan ?? "Free"}","${r.status}","${r.created_at}"`).join("\n");
@@ -75,19 +116,88 @@ function Page() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome..." className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm cursor-pointer hover:bg-white/10 outline-none [&>option]:bg-[#121214] [&>option]:text-white" style={{ colorScheme: "dark" }}>
           <option value="all">Todos status</option><option value="active">Ativo</option><option value="suspended">Suspenso</option><option value="pending">Pendente</option>
         </select>
-        <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+        <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm cursor-pointer hover:bg-white/10 outline-none [&>option]:bg-[#121214] [&>option]:text-white" style={{ colorScheme: "dark" }}>
           <option value="all">Todos planos</option><option>Free</option><option>Pro</option><option>Premium</option>
         </select>
       </div>
+
+      {selectedIds.length > 0 && (
+        <div className="glass rounded-2xl p-4 flex items-center justify-between gap-3 bg-primary/5 border border-primary/20 animate-fade-in flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-primary">{selectedIds.length} selecionados</span>
+            <button onClick={() => setSelectedIds([])} className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer">Limpar seleção</button>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Plano:</span>
+              <select
+                onChange={async (e) => {
+                  const plan = e.target.value;
+                  if (!plan) return;
+                  await bulkUpdatePlan(plan);
+                  e.target.value = "";
+                }}
+                className="bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs cursor-pointer hover:bg-white/10 outline-none [&>option]:bg-[#121214] [&>option]:text-white"
+                style={{ colorScheme: "dark" }}
+              >
+                <option value="">Alterar...</option>
+                <option value="Free">Free</option>
+                <option value="Pro">Pro</option>
+                <option value="Premium">Premium</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Status:</span>
+              <select
+                onChange={async (e) => {
+                  const status = e.target.value;
+                  if (!status) return;
+                  await bulkUpdateStatus(status);
+                  e.target.value = "";
+                }}
+                className="bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs cursor-pointer hover:bg-white/10 outline-none [&>option]:bg-[#121214] [&>option]:text-white"
+                style={{ colorScheme: "dark" }}
+              >
+                <option value="">Alterar...</option>
+                <option value="active">Ativo</option>
+                <option value="pending">Pendente</option>
+                <option value="suspended">Suspenso</option>
+              </select>
+            </div>
+
+            <button
+              onClick={bulkDelete}
+              className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Excluir
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="glass rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground bg-white/[0.02] sticky top-0">
               <tr>
+                <th className="px-4 py-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedIds.length === filtered.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(filtered.map(r => r.id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }}
+                    className="accent-primary rounded cursor-pointer scale-105"
+                  />
+                </th>
                 <th className="text-left font-medium px-4 py-3">Membro</th>
                 <th className="text-left font-medium px-4 py-3">Plano</th>
                 <th className="text-left font-medium px-4 py-3">Status</th>
@@ -97,10 +207,24 @@ function Page() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {loading && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-xs">Carregando...</td></tr>}
-              {!loading && filtered.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground text-xs">Nenhum membro encontrado</td></tr>}
+              {loading && <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground text-xs">Carregando...</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-xs">Nenhum membro encontrado</td></tr>}
               {filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-white/[0.02] transition">
+                <tr key={r.id} className={`hover:bg-white/[0.02] transition ${selectedIds.includes(r.id) ? "bg-primary/[0.02]" : ""}`}>
+                  <td className="px-4 py-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(r.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds([...selectedIds, r.id]);
+                        } else {
+                          setSelectedIds(selectedIds.filter(id => id !== r.id));
+                        }
+                      }}
+                      className="accent-primary rounded cursor-pointer scale-105"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-full gradient-primary flex items-center justify-center text-xs font-semibold text-primary-foreground">
