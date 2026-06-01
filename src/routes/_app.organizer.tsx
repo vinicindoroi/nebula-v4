@@ -238,6 +238,7 @@ function OrganizerPage() {
 
   // Task creation modal states
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("media");
@@ -354,6 +355,20 @@ function OrganizerPage() {
     setTasks(newTasks);
     localStorage.setItem("nebula_kanban_tasks", JSON.stringify(newTasks));
   };
+
+  // Keyboard shortcut: N to open new task modal (when not typing in an input)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        setIsTaskModalOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // Dynamic category registration helper
   const registerCategory = (catName: string) => {
@@ -556,10 +571,22 @@ function OrganizerPage() {
 
   // Move task column quick actions
   const moveTask = (id: string, dir: "left" | "right") => {
+    const task = tasks.find((t) => t.id === id);
+    const currIndex = task ? columns.findIndex((c) => c.id === task.column) : -1;
+    const nextIndex = currIndex + (dir === "right" ? 1 : -1);
+    const nextCol = nextIndex >= 0 && nextIndex < columns.length ? columns[nextIndex] : null;
+    const isMovingToDone = nextCol && (nextCol.id === doneColId);
+    if (isMovingToDone) {
+      setCompletingIds((prev) => new Set([...prev, id]));
+      setTimeout(() => {
+        setCompletingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+        const updated = tasks.map((t) => t.id === id ? { ...t, column: nextCol.id } : t);
+        syncTasks(updated);
+      }, 400);
+      return;
+    }
     const updated = tasks.map((t) => {
       if (t.id === id) {
-        const currIndex = columns.findIndex((c) => c.id === t.column);
-        let nextIndex = currIndex + (dir === "right" ? 1 : -1);
         if (nextIndex >= 0 && nextIndex < columns.length) {
           return { ...t, column: columns[nextIndex].id };
         }
@@ -1529,7 +1556,7 @@ function OrganizerPage() {
  
               <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[300px] pr-0.5 pt-1">
                 {tasks.filter((t) => (t.urgente) && (t.importante || t.importante === undefined) && t.column !== doneColId).map((t) => (
-                  <KanbanCard key={t.id} task={t} columnColor="red" onMove={moveTask} onDelete={deleteTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onEdit={setEditingTask} onToggleSubtask={handleToggleSubtask} />
+                  <div key={t.id} className={`transition-all duration-400 ${completingIds.has(t.id) ? 'opacity-0 scale-95 translate-y-1' : 'opacity-100'}`}><KanbanCard task={t} columnColor="red" onMove={moveTask} onDelete={deleteTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onEdit={setEditingTask} onToggleSubtask={handleToggleSubtask} /></div>
                 ))}
                 {tasks.filter((t) => (t.urgente) && (t.importante || t.importante === undefined) && t.column !== doneColId).length === 0 && <EmptyColumnState />}
               </div>
@@ -1562,7 +1589,7 @@ function OrganizerPage() {
  
               <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[300px] pr-0.5 pt-1">
                 {tasks.filter((t) => !(t.urgente) && (t.importante || t.importante === undefined) && t.column !== doneColId).map((t) => (
-                  <KanbanCard key={t.id} task={t} columnColor="amber" onMove={moveTask} onDelete={deleteTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onEdit={setEditingTask} onToggleSubtask={handleToggleSubtask} />
+                  <div key={t.id} className={`transition-all duration-400 ${completingIds.has(t.id) ? 'opacity-0 scale-95 translate-y-1' : 'opacity-100'}`}><KanbanCard task={t} columnColor="amber" onMove={moveTask} onDelete={deleteTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onEdit={setEditingTask} onToggleSubtask={handleToggleSubtask} /></div>
                 ))}
                 {tasks.filter((t) => !(t.urgente) && (t.importante || t.importante === undefined) && t.column !== doneColId).length === 0 && <EmptyColumnState />}
               </div>
@@ -1595,7 +1622,7 @@ function OrganizerPage() {
  
               <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[300px] pr-0.5 pt-1">
                 {tasks.filter((t) => (t.urgente) && !(t.importante) && t.column !== doneColId).map((t) => (
-                  <KanbanCard key={t.id} task={t} columnColor="blue" onMove={moveTask} onDelete={deleteTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onEdit={setEditingTask} onToggleSubtask={handleToggleSubtask} />
+                  <div key={t.id} className={`transition-all duration-400 ${completingIds.has(t.id) ? 'opacity-0 scale-95 translate-y-1' : 'opacity-100'}`}><KanbanCard task={t} columnColor="blue" onMove={moveTask} onDelete={deleteTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onEdit={setEditingTask} onToggleSubtask={handleToggleSubtask} /></div>
                 ))}
                 {tasks.filter((t) => (t.urgente) && !(t.importante) && t.column !== doneColId).length === 0 && <EmptyColumnState />}
               </div>
@@ -1628,7 +1655,7 @@ function OrganizerPage() {
  
               <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[300px] pr-0.5 pt-1">
                 {tasks.filter((t) => !(t.urgente) && !(t.importante) && t.column !== doneColId).map((t) => (
-                  <KanbanCard key={t.id} task={t} columnColor="emerald" onMove={moveTask} onDelete={deleteTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onEdit={setEditingTask} onToggleSubtask={handleToggleSubtask} />
+                  <div key={t.id} className={`transition-all duration-400 ${completingIds.has(t.id) ? 'opacity-0 scale-95 translate-y-1' : 'opacity-100'}`}><KanbanCard task={t} columnColor="emerald" onMove={moveTask} onDelete={deleteTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onEdit={setEditingTask} onToggleSubtask={handleToggleSubtask} /></div>
                 ))}
                 {tasks.filter((t) => !(t.urgente) && !(t.importante) && t.column !== doneColId).length === 0 && <EmptyColumnState />}
               </div>

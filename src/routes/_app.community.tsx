@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useDeferredValue } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   MessageCircle, Heart, Trash2, Send, Image as ImageIcon,
   X, ChevronDown, ChevronUp, CornerDownRight, Bookmark,
@@ -63,6 +64,7 @@ const formatRelativeTime = (dateStr: string) => {
 function CommunityPage() {
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const qc = useQueryClient();
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -71,6 +73,7 @@ function CommunityPage() {
   
   // Controle de busca e abas
   const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearch = useDeferredValue(searchQuery);
   const [activeTab, setActiveTab] = useState<"all" | "my" | "saved">("all");
   const [limit, setLimit] = useState(10);
 
@@ -498,13 +501,13 @@ function CommunityPage() {
     },
     onMutate: async ({ postId, liked }) => {
       await qc.cancelQueries({ queryKey: ["posts"] });
-      const prev = qc.getQueryData<Post[]>(["posts", user?.id]);
-      qc.setQueryData<Post[]>(["posts", user?.id], (old) =>
+      const prev = qc.getQueryData<Post[]>(["posts", user?.id, limit]);
+      qc.setQueryData<Post[]>(["posts", user?.id, limit], (old) =>
         (old ?? []).map((p) => (p.id === postId ? { ...p, liked: !liked, likes: p.likes + (liked ? -1 : 1) } : p))
       );
       return { prev };
     },
-    onError: (_e, _v, ctx: any) => ctx?.prev && qc.setQueryData(["posts", user?.id], ctx.prev),
+    onError: (_e, _v, ctx: any) => ctx?.prev && qc.setQueryData(["posts", user?.id, limit], ctx.prev),
     onSettled: () => qc.invalidateQueries({ queryKey: ["posts"] }),
   });
 
@@ -535,8 +538,8 @@ function CommunityPage() {
     if (activeTab === "saved" && !savedPosts.some((s) => s.post_id === p.id)) return false;
 
     // 2. Filtragem por Pesquisa
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (deferredSearch.trim()) {
+      const q = deferredSearch.toLowerCase();
       const contentMatch = p.content?.toLowerCase().includes(q);
       const authorMatch = p.author?.full_name?.toLowerCase().includes(q);
       return contentMatch || authorMatch;
@@ -796,7 +799,7 @@ function CommunityPage() {
                           type="button"
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (confirm("Deseja realmente apagar este story?")) {
+                            if (await confirm({ title: "Apagar story?", confirmLabel: "Apagar" })) {
                               try {
                                 const { error: dbErr } = await supabase
                                   .from("community_stories")
@@ -1040,7 +1043,7 @@ function CommunityPage() {
                 userId={user!.id}
                 saved={savedPosts.some((s) => s.post_id === p.id)}
                 onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })}
-                onDelete={() => { if (confirm("Deseja realmente apagar esta publicação?")) remove.mutate(p.id); }}
+                onDelete={async () => { if (await confirm({ title: "Apagar publicação?", description: "Esta ação não pode ser desfeita.", confirmLabel: "Apagar" })) remove.mutate(p.id); }}
                 onSave={() => toggleSave.mutate({ postId: p.id, postType: "community", saved: savedPosts.some((s) => s.post_id === p.id) })}
                 onEdit={async (id, content) => { await edit.mutateAsync({ id, content }); }}
               />
@@ -1059,6 +1062,7 @@ function CommunityPage() {
         )}
       </div>
       <MembersSidebar />
+      {confirmDialog}
     </div>
   );
 }
@@ -1486,7 +1490,7 @@ function CommentSection({ postId, postOwnerId, comments, userId }: { postId: str
   });
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addComment.mutate(); }
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addComment.mutate(); }
   };
 
   return (
@@ -1512,7 +1516,7 @@ function CommentSection({ postId, postOwnerId, comments, userId }: { postId: str
                     </div>
                     {isMine && (
                       <button
-                        onClick={() => { if (confirm("Apagar comentário?")) deleteComment.mutate(c.id); }}
+                        onClick={() => { confirm({ title: "Apagar comentário?", confirmLabel: "Apagar" }).then((ok) => { if (ok) deleteComment.mutate(c.id); }); }}
                         className="opacity-0 group-hover/balloon:opacity-100 text-muted-foreground hover:text-red-400 p-0.5 rounded transition-all duration-200"
                         title="Apagar comentário"
                       >

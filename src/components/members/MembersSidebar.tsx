@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { Instagram, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Instagram, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Member = {
@@ -28,9 +29,13 @@ export function MembersSidebar() {
     refetchInterval: 1000 * 60,
   });
 
+  const [showAllOffline, setShowAllOffline] = useState(false);
+  const OFFLINE_LIMIT = 8;
+
   const now = Date.now();
   const online = members.filter((m) => m.last_seen_at && now - new Date(m.last_seen_at).getTime() < ONLINE_THRESHOLD);
   const offline = members.filter((m) => !m.last_seen_at || now - new Date(m.last_seen_at).getTime() >= ONLINE_THRESHOLD);
+  const visibleOffline = showAllOffline ? offline : offline.slice(0, OFFLINE_LIMIT);
 
   return (
     <aside className="w-[260px] shrink-0 hidden xl:block animate-fade-up">
@@ -50,7 +55,17 @@ export function MembersSidebar() {
           
           <div className="p-2 max-h-[260px] overflow-y-auto scrollbar-thin">
             {isLoading ? (
-              <div className="px-2 py-6 text-center text-[11px] text-muted-foreground/60 animate-pulse">Carregando membros...</div>
+              <div className="space-y-1 p-1">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-2 py-2 animate-pulse">
+                    <div className="h-8 w-8 rounded-xl bg-white/[0.06] shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-2.5 w-24 bg-white/[0.06] rounded-full" />
+                      <div className="h-2 w-16 bg-white/[0.04] rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : online.length === 0 ? (
               <div className="px-2 py-6 text-center text-[11px] text-muted-foreground/50 italic">Nenhum membro ativo</div>
             ) : (
@@ -76,7 +91,16 @@ export function MembersSidebar() {
               <div className="px-2 py-6 text-center text-[11px] text-muted-foreground/50">Todos na rede online!</div>
             ) : (
               <div className="space-y-0.5">
-                {offline.map((m) => <MemberRow key={m.id} member={m} online={false} />)}
+                {visibleOffline.map((m) => <MemberRow key={m.id} member={m} online={false} />)}
+                {offline.length > OFFLINE_LIMIT && (
+                  <button
+                    onClick={() => setShowAllOffline(v => !v)}
+                    className="w-full mt-1 flex items-center justify-center gap-1 py-1.5 text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-lg hover:bg-white/[0.03]"
+                  >
+                    <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showAllOffline ? 'rotate-180' : ''}`} />
+                    {showAllOffline ? 'Ver menos' : `Ver mais ${offline.length - OFFLINE_LIMIT} membros`}
+                  </button>
+                )}
               </div>
             )}
           </div>

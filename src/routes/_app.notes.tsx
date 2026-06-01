@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useDeferredValue } from 'react';
 import { Search, Plus, Pin, Pencil, Trash2, StickyNote, LayoutGrid, List, GitBranch, GraduationCap, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,13 +17,19 @@ type ViewMode = 'grid' | 'list' | 'graph';
 
 function NotesPage() {
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => (localStorage.getItem('notes-view') as ViewMode) || 'grid');
+
+  const handleSetViewMode = (m: ViewMode) => {
+    setViewMode(m);
+    localStorage.setItem('notes-view', m);
+  };
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<UserNote | null>(null);
 
   const { notes, isLoading, allTags, createNote, updateNote, deleteNote, togglePin } = useNotes({
-    search,
+    search: deferredSearch,
     tag: selectedTag || undefined,
   });
 
@@ -95,21 +101,21 @@ function NotesPage() {
           {/* View mode toggle */}
           <div className="flex items-center bg-white/[0.03] border border-white/10 rounded-lg p-0.5">
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => handleSetViewMode('grid')}
               className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
               title="Grade"
             >
               <LayoutGrid className="h-4 w-4" />
             </button>
             <button
-              onClick={() => setViewMode('list')}
+              onClick={() => handleSetViewMode('list')}
               className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
               title="Lista"
             >
               <List className="h-4 w-4" />
             </button>
             <button
-              onClick={() => setViewMode('graph')}
+              onClick={() => handleSetViewMode('graph')}
               className={`p-1.5 rounded-md transition-colors ${viewMode === 'graph' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
               title="Grafo"
             >

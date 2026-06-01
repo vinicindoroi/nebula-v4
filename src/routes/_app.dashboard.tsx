@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMemberProgress } from "@/hooks/use-member-progress";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -116,7 +116,7 @@ interface LocalTask {
 function Dashboard() {
   const { user } = useAuth();
   const { data: courses = [], isLoading } = useCourses();
-  const { data: memberProgress } = useMemberProgress();
+  const { data: memberProgress, isLoading: isProgressLoading } = useMemberProgress();
   const name = ((user?.user_metadata as any)?.full_name || user?.email?.split("@")[0] || "Membro").split(" ")[0];
 
   const totalLessons = courses.reduce((s, c) => s + c.totalLessons, 0);
@@ -260,13 +260,16 @@ function Dashboard() {
     return `Pronto para a sua próxima órbita de conhecimento? A persistência diária é o segredo para construir resultados sólidos. 🪐`;
   };
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { const t = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(t); }, []);
+
   const recommendedCourse = inProgress[0] || notStarted[0] || courses[0];
 
   const stats = [
-    { label: "Progresso geral", value: `${overall}%`, icon: TrendingUp, hint: `${completedLessons} de ${totalLessons} aulas`, accent: "primary" as const },
-    { label: "Aulas concluídas", value: completedLessons, icon: Clock, hint: "no total", accent: "cyan" as const },
-    { label: "Cursos completos", value: completed, icon: Award, hint: completed === 1 ? "concluído" : "concluídos", accent: "emerald" as const },
-    { label: "Em andamento", value: inProgress.length, icon: Flame, hint: "continue!", accent: "amber" as const },
+    { label: "Progresso geral", value: `${overall}%`, icon: TrendingUp, hint: `${completedLessons} de ${totalLessons} aulas`, accent: "primary" as const, to: "/courses" as const },
+    { label: "Aulas concluídas", value: completedLessons, icon: Clock, hint: "no total", accent: "cyan" as const, to: "/courses" as const },
+    { label: "Cursos completos", value: completed, icon: Award, hint: completed === 1 ? "concluído" : "concluídos", accent: "emerald" as const, to: "/courses" as const },
+    { label: "Em andamento", value: inProgress.length, icon: Flame, hint: "continue!", accent: "amber" as const, to: "/courses" as const },
   ];
 
   return (
@@ -329,9 +332,9 @@ function Dashboard() {
                 <span className="font-semibold">{xpInCurrentLevel} / {xpNeededPerLevel} XP</span>
               </div>
               <div className="h-2 w-full rounded-full bg-white/[0.04] overflow-hidden p-[1px] border border-white/[0.06]">
-                <div 
-                  className="h-full rounded-full gradient-primary shadow-[0_0_12px_rgba(139,92,246,0.6)] transition-all duration-700" 
-                  style={{ width: `${xpProgressPct}%` }}
+                <div
+                  className="h-full rounded-full gradient-primary shadow-[0_0_12px_rgba(139,92,246,0.6)] transition-all duration-1000"
+                  style={{ width: mounted ? `${xpProgressPct}%` : '0%' }}
                 />
               </div>
             </div>
@@ -350,9 +353,10 @@ function Dashboard() {
             amber: { bg: "bg-amber-500/10", text: "text-amber-400", glow: "group-hover:shadow-[0_8px_24px_-8px_oklch(0.7_0.15_80/0.3)]" },
           }[s.accent];
           return (
-            <div
+            <Link
               key={s.label}
-              className={`group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300 ${accentStyles.glow}`}
+              to={s.to}
+              className={`group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300 active:scale-[0.98] ${accentStyles.glow}`}
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <div className={`absolute -top-8 -right-8 w-20 h-20 rounded-full ${accentStyles.bg} blur-2xl opacity-0 group-hover:opacity-60 transition-opacity duration-500`} />
@@ -367,7 +371,7 @@ function Dashboard() {
                 <div className="text-xs text-muted-foreground mt-1 font-medium">{s.label}</div>
                 <div className="text-[10px] text-muted-foreground/50 mt-0.5">{s.hint}</div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </section>
@@ -575,6 +579,28 @@ function Dashboard() {
         {/* Right Column (Gamification & Side Charts) */}
         <div className="lg:col-span-5 xl:col-span-4 space-y-6">
 
+          {isProgressLoading && (
+            <>
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 animate-pulse space-y-3">
+                <div className="h-4 w-32 bg-white/[0.06] rounded" />
+                <div className="h-3 w-48 bg-white/[0.04] rounded" />
+                <div className="flex gap-2 mt-4">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="flex-1 h-9 bg-white/[0.04] rounded-xl" />
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 animate-pulse space-y-3">
+                <div className="h-4 w-36 bg-white/[0.06] rounded" />
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="h-28 bg-white/[0.04] rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Upgraded Ofensiva Cósmica Grid */}
           {streak && (
             <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 hover:border-white/[0.08] transition-all duration-300">
@@ -598,13 +624,14 @@ function Dashboard() {
               </p>
               
               <div className="flex items-center gap-2 justify-between py-2.5 px-2 bg-white/[0.01] rounded-xl border border-white/[0.04]">
-                {streak.weekDays.map((day) => {
+                {streak.weekDays.map((day, dayIdx) => {
                   const dateObj = new Date(day.date + "T12:00:00");
                   const label = DAY_LABELS[dateObj.getDay()];
                   return (
                     <div key={day.date} className="flex-1 flex flex-col items-center gap-1.5 group/day relative">
                       <div
-                        className={`h-9 w-9 rounded-xl flex flex-col items-center justify-center text-xs font-semibold tracking-tight transition-all duration-300 ${
+                        style={{ transitionDelay: `${dayIdx * 60}ms` }}
+                        className={`h-9 w-9 rounded-xl flex flex-col items-center justify-center text-xs font-semibold tracking-tight transition-all duration-500 ${
                           day.active
                             ? "bg-gradient-to-br from-amber-500/30 to-amber-600/10 text-amber-400 ring-2 ring-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)] scale-105"
                             : "bg-white/[0.03] text-muted-foreground/35 border border-white/[0.04]"
@@ -780,7 +807,10 @@ function Dashboard() {
                   return (
                     <div
                       key={a.id}
-                      className={`group relative rounded-xl border p-3.5 text-center transition-all duration-300 flex flex-col items-center justify-between min-h-[135px] select-none ${
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`${a.title}${a.unlocked ? ' — Desbloqueado' : ` — Bloqueado, ${a.progress ?? 0}% concluído`}`}
+                      className={`group relative rounded-xl border p-3.5 text-center transition-all duration-300 flex flex-col items-center justify-between min-h-[135px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                         a.unlocked
                           ? `${cfg.unlockedBorder} ${cfg.unlockedBg} ${cfg.glow}`
                           : "border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.02] hover:border-white/[0.08]"
@@ -904,7 +934,7 @@ function NewCourseCard({ course, index }: { course: ReturnType<typeof useCourses
     >
       <div className="aspect-[16/9] relative overflow-hidden">
         {c.cover_url && (
-          <img src={c.cover_url} alt={c.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={c.cover_url} alt={c.title} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         )}
         <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${c.gradient_from || "#6366f1"}, ${(c.gradient_to || "#8b5cf6")}00)` }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />

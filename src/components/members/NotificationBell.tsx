@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Bell, Check, CheckCheck, X } from "lucide-react";
 import { useNotifications, useMarkNotificationRead, useMarkAllRead } from "@/hooks/use-notifications";
+import { useRouterState } from "@tanstack/react-router";
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -8,9 +9,26 @@ export function NotificationBell() {
   const { data: notifications = [], isLoading } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllRead();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+
+  // Close on route change
+  useEffect(() => {
+    setOpen(false);
+  }, [path]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
+  const prevUnreadRef = useRef(unreadCount);
+  const [shaking, setShaking] = useState(false);
+
+  useEffect(() => {
+    if (unreadCount > prevUnreadRef.current) {
+      setShaking(true);
+      const t = setTimeout(() => setShaking(false), 600);
+      return () => clearTimeout(t);
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
 
   // Close on click outside
   useEffect(() => {
@@ -37,7 +55,7 @@ export function NotificationBell() {
         className="relative p-2 rounded-xl hover:bg-white/5 transition"
         aria-label="Notificações"
       >
-        <Bell className="h-4 w-4" />
+        <Bell className={`h-4 w-4 transition-transform ${shaking ? 'animate-[wiggle_0.6s_ease-in-out]' : ''}`} />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center text-[9px] font-bold text-primary-foreground ring-2 ring-background">
             {unreadCount > 9 ? "9+" : unreadCount}

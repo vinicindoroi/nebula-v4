@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useDeferredValue } from "react";
 import { createPortal } from "react-dom";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Search, Plus, Heart, MessageCircle, Eye, Hash, Briefcase,
   X, Send, Image as ImageIcon, Pin, Trash2, Edit3, Bookmark,
@@ -39,7 +40,9 @@ const db = supabase as any;
 function ForumPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showServices, setShowServices] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -96,8 +99,8 @@ function ForumPage() {
   const filtered = posts.filter((p) => {
     if (showServices && !p.is_service) return false;
     if (activeTag && !p.tags.some((t) => t.id === activeTag)) return false;
-    if (search) {
-      const q = search.toLowerCase();
+    if (deferredSearch) {
+      const q = deferredSearch.toLowerCase();
       return p.title.toLowerCase().includes(q) || p.content.toLowerCase().includes(q);
     }
     return true;
@@ -150,16 +153,21 @@ function ForumPage() {
           <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar no fórum..." className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar no fórum..." className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
             <button onClick={() => setShowServices(!showServices)} className={`px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 border transition ${showServices ? "border-pink-500/30 bg-pink-500/10 text-pink-400" : "border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5"}`}>
               <Briefcase className="h-3.5 w-3.5" /> Serviços
             </button>
           </div>
           <div className="flex gap-1.5 flex-wrap">
-            <button onClick={() => setActiveTag(null)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition ${!activeTag ? "bg-primary/15 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent"}`}>Todos</button>
+            <button onClick={() => { setActiveTag(null); setSearch(""); }} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition ${!activeTag ? "bg-primary/15 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent"}`}>Todos</button>
             {tags.map((t) => (
-              <button key={t.id} onClick={() => setActiveTag(activeTag === t.id ? null : t.id)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${activeTag === t.id ? "border-white/20 bg-white/10 text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"}`}>
+              <button key={t.id} onClick={() => { setActiveTag(activeTag === t.id ? null : t.id); setSearch(""); }} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${activeTag === t.id ? "border-white/20 bg-white/10 text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"}`}>
                 <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: t.color }} />{t.name}
               </button>
             ))}
@@ -191,7 +199,7 @@ function ForumPage() {
                       </div>
                       <div className="space-y-3">
                         {pinnedPosts.map((p) => (
-                          <ForumPostCard key={p.id} post={p} userId={user!.id} onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })} onDelete={() => { if (confirm("Apagar post?")) remove.mutate(p.id); }} onClick={() => setViewingPost(p)} />
+                          <ForumPostCard key={p.id} post={p} userId={user!.id} onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })} onDelete={async () => { if (await confirm({ title: "Apagar post?", description: "Esta ação não pode ser desfeita.", confirmLabel: "Apagar" })) remove.mutate(p.id); }} onClick={() => setViewingPost(p)} />
                         ))}
                       </div>
                     </div>
@@ -203,7 +211,7 @@ function ForumPage() {
                         <h3 className="text-xs font-semibold text-muted-foreground/50 uppercase tracking-wider px-1 pt-2">Discussões Recentes</h3>
                       )}
                       {regularPosts.map((p) => (
-                        <ForumPostCard key={p.id} post={p} userId={user!.id} onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })} onDelete={() => { if (confirm("Apagar post?")) remove.mutate(p.id); }} onClick={() => setViewingPost(p)} />
+                        <ForumPostCard key={p.id} post={p} userId={user!.id} onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })} onDelete={async () => { if (await confirm({ title: "Apagar post?", description: "Esta ação não pode ser desfeita.", confirmLabel: "Apagar" })) remove.mutate(p.id); }} onClick={() => setViewingPost(p)} />
                       ))}
                     </div>
                   ) : pinnedPosts.length === 0 ? (
@@ -221,6 +229,7 @@ function ForumPage() {
       </div>
       {creating && <CreatePostModal tags={tags} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); qc.invalidateQueries({ queryKey: ["forum"] }); }} />}
       {viewingPost && <PostDetailModal post={viewingPost} userId={user!.id} onClose={() => setViewingPost(null)} onLike={() => toggleLike.mutate({ postId: viewingPost.id, liked: viewingPost.liked })} />}
+      {confirmDialog}
     </div>
   );
 }
@@ -385,6 +394,15 @@ function ForumPostCard({ post, userId, onLike, onDelete, onClick }: { post: Foru
 function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; userId: string; onClose: () => void; onLike: () => void }) {
   const qc = useQueryClient();
   const addXp = useAddXp();
+
+  // Increment view count once per session per post
+  useEffect(() => {
+    const key = `forum_viewed_${post.id}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+    db.from("forum_posts").update({ views: (post.views || 0) + 1 }).eq("id", post.id)
+      .then(() => qc.invalidateQueries({ queryKey: ["forum"] }));
+  }, [post.id]);
   const [replyText, setReplyText] = useState("");
   const [replyImg, setReplyImg] = useState<File | null>(null);
   const [replyPreview, setReplyPreview] = useState<string | null>(null);
@@ -444,7 +462,7 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
 
   const handleReplyImg = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 5*1024*1024) { toast.error("Máximo 5MB"); return; } setReplyImg(f); setReplyPreview(URL.createObjectURL(f)); };
   const clearReplyImg = () => { setReplyImg(null); if (replyPreview) URL.revokeObjectURL(replyPreview); setReplyPreview(null); if (replyFileRef.current) replyFileRef.current.value = ""; };
-  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addReply.mutate(); } };
+  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addReply.mutate(); } };
 
   const authorName = post.author?.full_name || "Membro";
   const authorInitials = authorName.slice(0, 2).toUpperCase();

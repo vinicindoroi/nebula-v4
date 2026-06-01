@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useChildMatches } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Play, Search, Filter, BookOpen, CheckCircle2, Clock } from "lucide-react";
+import { useMemo, useState, useDeferredValue } from "react";
+import { Play, Search, Filter, BookOpen, CheckCircle2, Clock, X } from "lucide-react";
 import { useCourses } from "@/hooks/use-courses";
 
 export const Route = createFileRoute("/_app/courses")({
@@ -25,6 +25,7 @@ function CoursesList() {
   const [filter, setFilter] = useState<string>("all");
   const [tag, setTag] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const { data: courses = [], isLoading } = useCourses();
 
   const tags = useMemo(() => {
@@ -39,10 +40,10 @@ function CoursesList() {
       if (filter === "done" && c.progress !== 100) return false;
       if (filter === "new" && c.progress !== 0) return false;
       if (tag && c.tag !== tag) return false;
-      if (search && !c.title.toLowerCase().includes(search.toLowerCase()) && !(c.description ?? "").toLowerCase().includes(search.toLowerCase())) return false;
+      if (deferredSearch && !c.title.toLowerCase().includes(deferredSearch.toLowerCase()) && !(c.description ?? "").toLowerCase().includes(deferredSearch.toLowerCase())) return false;
       return true;
     });
-  }, [courses, filter, tag, search]);
+  }, [courses, filter, tag, deferredSearch]);
 
   return (
     <div className="space-y-6">
@@ -64,8 +65,16 @@ function CoursesList() {
               placeholder="Buscar por título ou descrição..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:border-primary/40 transition"
+              className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-9 pr-8 py-2 text-sm outline-none focus:border-primary/40 transition"
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/10">
             {QUICK_FILTERS.map((f) => {
@@ -147,7 +156,7 @@ function CoursesList() {
             >
               <div className="aspect-[16/10] relative overflow-hidden">
                 {c.cover_url && (
-                  <img src={c.cover_url} alt={c.title} className="absolute inset-0 w-full h-full object-cover" />
+                  <img src={c.cover_url} alt={c.title} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" />
                 )}
                 <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${c.gradient_from || "#6366f1"}, ${(c.gradient_to || "#8b5cf6")}00)` }} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />

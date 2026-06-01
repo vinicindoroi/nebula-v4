@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   Bell, Lock, Palette, Globe, LogOut, KeyRound, Eye, EyeOff,
   User as UserIcon, ShieldCheck, AlertTriangle, Check,
 } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -41,9 +42,21 @@ const TABS = [
 function SettingsPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<typeof TABS[number]["id"]>("account");
+  const router = useRouter();
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const initialTab = (searchParams.get("tab") as typeof TABS[number]["id"]) || "account";
+  const [tab, setTab] = useState<typeof TABS[number]["id"]>(initialTab);
+
+  const handleTabChange = (id: typeof TABS[number]["id"]) => {
+    setTab(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", id);
+    window.history.replaceState({}, "", url.toString());
+  };
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [busy, setBusy] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -90,16 +103,19 @@ function SettingsPage() {
 
   const changePassword = async () => {
     if (newPass.length < 6) return toast.error("Senha precisa ter no mínimo 6 caracteres");
+    if (newPass !== confirmPass) return toast.error("As senhas não coincidem");
     setBusy(true);
     const { error } = await supabase.auth.updateUser({ password: newPass });
     setBusy(false);
     if (error) return toast.error(error.message);
     setNewPass("");
+    setConfirmPass("");
     toast.success("Senha atualizada");
   };
 
   const onSignOut = async () => {
-    if (!confirm("Tem certeza que deseja sair?")) return;
+    const ok = await confirm({ title: "Sair da conta?", description: "Você será desconectado e redirecionado para o login.", confirmLabel: "Sair", variant: "destructive" });
+    if (!ok) return;
     await signOut();
     navigate({ to: "/login" });
   };
@@ -123,8 +139,8 @@ function SettingsPage() {
               return (
                 <button
                   key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm transition shrink-0 whitespace-nowrap lg:w-full ${
+                  onClick={() => handleTabChange(t.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm transition shrink-0 whitespace-nowrap lg:w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                     active
                       ? "bg-gradient-to-r from-primary/15 via-primary/5 to-transparent text-foreground border border-primary/10 lg:border-transparent"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/5"
@@ -224,6 +240,20 @@ function SettingsPage() {
                   </div>
                 </Field>
                 {newPass && (
+                  <Field label="Confirmar nova senha" icon={KeyRound}>
+                    <input
+                      type="password"
+                      value={confirmPass}
+                      onChange={(e) => setConfirmPass(e.target.value)}
+                      placeholder="••••••••"
+                      className={`${inputClass} ${confirmPass && confirmPass !== newPass ? 'border-red-500/50 focus:ring-red-500/30' : ''}`}
+                    />
+                    {confirmPass && confirmPass !== newPass && (
+                      <p className="text-xs text-red-400 mt-1">As senhas não coincidem</p>
+                    )}
+                  </Field>
+                )}
+                {newPass && (
                   <div className="mt-3 space-y-1.5">
                     <div className="flex gap-1.5">
                       {[0, 1, 2, 3].map((i) => (
@@ -248,7 +278,7 @@ function SettingsPage() {
                 )}
                 <button
                   onClick={changePassword}
-                  disabled={busy || newPass.length < 6}
+                  disabled={busy || newPass.length < 6 || (!!confirmPass && confirmPass !== newPass)}
                   className="mt-4 gradient-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 disabled:opacity-50"
                 >
                   <Check className="h-4 w-4" />
@@ -284,6 +314,7 @@ function SettingsPage() {
           )}
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

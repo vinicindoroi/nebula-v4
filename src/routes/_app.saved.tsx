@@ -76,6 +76,11 @@ function SavedPage() {
   });
 
   const filtered = items.filter((i) => filter === "all" || i.post_type === filter);
+  const counts = {
+    all: items.length,
+    forum: items.filter((i) => i.post_type === "forum").length,
+    community: items.filter((i) => i.post_type === "community").length,
+  };
 
   return (
     <div className="space-y-6">
@@ -89,9 +94,14 @@ function SavedPage() {
           <button
             key={id}
             onClick={() => setFilter(id)}
-            className={`text-xs px-3 py-1.5 rounded-lg transition ${filter === id ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${filter === id ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
             {label}
+            {counts[id] > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${filter === id ? "bg-white/10" : "bg-white/5"}`}>
+                {counts[id]}
+              </span>
+            )}
           </button>
         ))}
       </div>
