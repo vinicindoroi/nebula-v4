@@ -310,6 +310,7 @@ export function FunnelsSidebar({
               filteredFunnels.map((funnel) => {
                 const isSelected = selectedFunnel?.id === funnel.id;
                 const isMind = funnel.funnel_type === 'mind';
+                const isCanvas = funnel.funnel_type === 'canvas';
                 return (
                   <div
                     key={funnel.id}
@@ -331,11 +332,19 @@ export function FunnelsSidebar({
                         isSelected
                           ? isMind
                             ? 'bg-purple-500/15 text-purple-400'
+                            : isCanvas
+                            ? 'bg-emerald-500/15 text-emerald-400'
                             : 'bg-primary/15 text-primary'
                           : 'bg-white/[0.03] text-muted-foreground group-hover:bg-white/[0.06]'
                       )}
                     >
-                      {isMind ? <Brain className="w-3.5 h-3.5" /> : <GitFork className="w-3.5 h-3.5" />}
+                      {isMind ? (
+                        <Brain className="w-3.5 h-3.5" />
+                      ) : isCanvas ? (
+                        <Pencil className="w-3.5 h-3.5" />
+                      ) : (
+                        <GitFork className="w-3.5 h-3.5" />
+                      )}
                     </div>
 
                     <div className="min-w-0 flex-1">

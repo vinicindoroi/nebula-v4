@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   MessageCircle, Heart, Trash2, Send, Image as ImageIcon,
   X, ChevronDown, ChevronUp, CornerDownRight, Bookmark,
-  Search, Share2, Sparkles, Filter, User, Plus
+  Search, Share2, Sparkles, Filter, User, Plus, Pencil
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -511,6 +511,18 @@ function CommunityPage() {
   const remove = useMutation({
     mutationFn: async (id: string) => { await db.from("posts").delete().eq("id", id); },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
+  });
+
+  const edit = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const { error } = await db.from("posts").update({ content }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["posts"] });
+      toast.success("Publicação atualizada!");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const initials = ((user?.user_metadata as any)?.full_name || user?.email || "M").slice(0, 2).toUpperCase();
@@ -1030,6 +1042,7 @@ function CommunityPage() {
                 onLike={() => toggleLike.mutate({ postId: p.id, liked: p.liked })}
                 onDelete={() => { if (confirm("Deseja realmente apagar esta publicação?")) remove.mutate(p.id); }}
                 onSave={() => toggleSave.mutate({ postId: p.id, postType: "community", saved: savedPosts.some((s) => s.post_id === p.id) })}
+                onEdit={async (id, content) => { await edit.mutateAsync({ id, content }); }}
               />
             ))}
             {filteredPosts.length >= limit && (
@@ -1215,12 +1228,26 @@ function Avatar({ initials, size = "md", xp = 0, avatarUrl = null }: { initials:
 
 /* ─── Post Card ─── */
 
-function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Post; userId: string; saved: boolean; onLike: () => void; onDelete: () => void; onSave: () => void }) {
+function PostCard({ post, userId, saved, onLike, onDelete, onSave, onEdit }: { 
+  post: Post; 
+  userId: string; 
+  saved: boolean; 
+  onLike: () => void; 
+  onDelete: () => void; 
+  onSave: () => void; 
+  onEdit: (id: string, content: string) => Promise<void>;
+}) {
   const [showComments, setShowComments] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content || "");
   const name = post.author?.full_name || "Membro";
   const initial = name.slice(0, 2).toUpperCase();
   const mine = post.user_id === userId;
   const xpValue = post.author?.xp ?? 0;
+
+  useEffect(() => {
+    setEditContent(post.content || "");
+  }, [post.content]);
 
   const handleShare = () => {
     // Cria um texto amigável com um link simulado para a comunidade
@@ -1261,22 +1288,68 @@ function PostCard({ post, userId, saved, onLike, onDelete, onSave }: { post: Pos
           </div>
         </div>
         
-        {mine && (
-          <button
-            onClick={onDelete}
-            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 p-2 rounded-xl hover:bg-red-500/10 transition-all duration-200"
-            aria-label="Apagar"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+        {mine && !isEditing && (
+          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
+            <button
+              onClick={() => setIsEditing(true)}
+              className="text-muted-foreground hover:text-[#8b5cf6] p-2 rounded-xl hover:bg-[#8b5cf6]/10 transition-all duration-200 cursor-pointer"
+              aria-label="Editar"
+              title="Editar publicação"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onDelete}
+              className="text-muted-foreground hover:text-red-400 p-2 rounded-xl hover:bg-red-500/10 transition-all duration-200 cursor-pointer"
+              aria-label="Apagar"
+              title="Apagar publicação"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
 
       {/* Content */}
-      {post.content && (
-        <div className="px-5 pt-3 pb-1 relative z-10 pl-[62px]">
-          <div className="text-[13px] leading-[1.6] break-words text-foreground/90 prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
+      {isEditing ? (
+        <div className="px-5 pt-3 pb-2 relative z-10 pl-[62px] space-y-3 animate-fade-up">
+          <RichTextEditor
+            content={editContent}
+            onChange={(html) => setEditContent(html)}
+            placeholder="O que está pensando hoje para compartilhar?"
+            minHeight="80px"
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setEditContent(post.content || "");
+              }}
+              className="px-3.5 py-1.5 rounded-xl border border-white/10 hover:bg-white/5 text-[11px] font-semibold text-slate-300 transition-all active:scale-95 cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={async () => {
+                if (!editContent.trim() && !post.image_url) {
+                  toast.error("O conteúdo da publicação não pode estar vazio!");
+                  return;
+                }
+                await onEdit(post.id, editContent);
+                setIsEditing(false);
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-[11px] font-semibold text-white transition-all active:scale-95 cursor-pointer shadow-md shadow-purple-500/15"
+            >
+              Salvar
+            </button>
+          </div>
         </div>
+      ) : (
+        post.content && (
+          <div className="px-5 pt-3 pb-1 relative z-10 pl-[62px]">
+            <div className="text-[13px] leading-[1.6] break-words text-foreground/90 prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
+          </div>
+        )
       )}
 
       {/* Image */}

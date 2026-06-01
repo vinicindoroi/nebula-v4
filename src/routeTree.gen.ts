@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RespostasRouteImport } from './routes/respostas'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LandingRouteImport } from './routes/landing'
 import { Route as FormsRouteImport } from './routes/forms'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AppRouteImport } from './routes/_app'
@@ -59,6 +60,11 @@ const RespostasRoute = RespostasRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LandingRoute = LandingRouteImport.update({
+  id: '/landing',
+  path: '/landing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FormsRoute = FormsRouteImport.update({
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/forms': typeof FormsRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/respostas': typeof RespostasRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/forms': typeof FormsRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/respostas': typeof RespostasRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -306,6 +314,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
   '/forms': typeof FormsRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/respostas': typeof RespostasRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -345,6 +354,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/forms'
+    | '/landing'
     | '/login'
     | '/respostas'
     | '/sitemap.xml'
@@ -382,6 +392,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/forms'
+    | '/landing'
     | '/login'
     | '/respostas'
     | '/sitemap.xml'
@@ -420,6 +431,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/admin'
     | '/forms'
+    | '/landing'
     | '/login'
     | '/respostas'
     | '/sitemap.xml'
@@ -459,6 +471,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
   FormsRoute: typeof FormsRoute
+  LandingRoute: typeof LandingRoute
   LoginRoute: typeof LoginRoute
   RespostasRoute: typeof RespostasRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -485,6 +498,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/landing': {
+      id: '/landing'
+      path: '/landing'
+      fullPath: '/landing'
+      preLoaderRoute: typeof LandingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forms': {
@@ -810,6 +830,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
   FormsRoute: FormsRoute,
+  LandingRoute: LandingRoute,
   LoginRoute: LoginRoute,
   RespostasRoute: RespostasRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

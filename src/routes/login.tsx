@@ -43,29 +43,6 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Fetch global_settings to see if restrictToLeads is active
-      const { data: settings } = await supabase
-        .from("global_settings")
-        .select("restrict_to_leads")
-        .eq("id", "current")
-        .maybeSingle();
-
-      if (settings?.restrict_to_leads) {
-        // Check if email exists in leads table anonymously using check_email_in_leads secure function
-        const { data: exists, error: rpcError } = await supabase
-          .rpc("check_email_in_leads", { check_email: email.trim().toLowerCase() });
-
-        if (rpcError) {
-          console.error("Error checking lead email:", rpcError);
-        }
-
-        if (!exists) {
-          toast.error("Este e-mail não consta na nossa lista de leads autorizados. Por favor, preencha o formulário de aplicação em /forms primeiro!");
-          setLoading(false);
-          return;
-        }
-      }
-
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
@@ -78,8 +55,41 @@ function LoginPage() {
         if (error) throw error;
         toast.success("Conta criada! Entrando...");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+
+        // After successful auth, check if restrict_to_leads is active
+        const { data: settings } = await supabase
+          .from("global_settings")
+          .select("restrict_to_leads")
+          .eq("id", "current")
+          .maybeSingle();
+
+        if (settings?.restrict_to_leads && authData.user) {
+          // Check if user is admin via user_roles table — admins always bypass
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", authData.user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+
+          if (!roleData) {
+            // Not admin — check if email exists in leads table
+            const { data: exists, error: rpcError } = await supabase
+              .rpc("check_email_in_leads", { check_email: email.trim().toLowerCase() });
+
+            if (rpcError) {
+              console.warn("[Login] RPC check_email_in_leads failed, allowing login:", rpcError.message);
+            } else if (!exists) {
+              // Not in leads — sign them out and block
+              await supabase.auth.signOut();
+              toast.error("Este e-mail não consta na nossa lista de leads autorizados. Por favor, preencha o formulário de aplicação em /forms primeiro!");
+              setLoading(false);
+              return;
+            }
+          }
+        }
       }
       navigate({ to: "/dashboard" });
     } catch (err: any) {
@@ -140,7 +150,7 @@ function LoginPage() {
           </form>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            <a href="/" className="hover:text-foreground transition-colors">← Voltar</a>
+            <a href="/landing" className="hover:text-foreground transition-colors">← Ir para a Página de Vendas</a>
           </p>
         </div>
       </div>

@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { GitFork, Brain } from 'lucide-react';
+import { GitFork, Brain, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NewFunnelDialogProps {
@@ -54,35 +54,50 @@ export function NewFunnelDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Tipo de Funil</Label>
-            <RadioGroup value={funnelType} onValueChange={setFunnelType} className="grid grid-cols-2 gap-3">
+            <RadioGroup value={funnelType} onValueChange={setFunnelType} className="grid grid-cols-3 gap-3">
               <label
                 htmlFor="type-funnelytics"
                 className={cn(
-                  "flex flex-col items-center gap-2 rounded-lg border-2 p-4 cursor-pointer transition-colors",
+                  "flex flex-col items-center justify-between gap-2 rounded-lg border-2 p-3 cursor-pointer transition-colors text-center h-full",
                   funnelType === 'funnelytics'
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-muted-foreground/40"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-white"
                 )}
               >
                 <RadioGroupItem value="funnelytics" id="type-funnelytics" className="sr-only" />
-                <GitFork className="h-6 w-6 text-primary" />
-                <span className="text-sm font-medium">Funnelytics</span>
-                <span className="text-[11px] text-muted-foreground text-center leading-tight">Construção visual de funis</span>
+                <GitFork className="h-5 w-5" />
+                <span className="text-xs font-semibold">Funnelytics</span>
+                <span className="text-[10px] opacity-70 leading-tight">Mapeamento visual</span>
               </label>
 
               <label
                 htmlFor="type-mind"
                 className={cn(
-                  "flex flex-col items-center gap-2 rounded-lg border-2 p-4 cursor-pointer transition-colors relative",
+                  "flex flex-col items-center justify-between gap-2 rounded-lg border-2 p-3 cursor-pointer transition-colors text-center h-full",
                   funnelType === 'mind'
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-muted-foreground/40"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-white"
                 )}
               >
                 <RadioGroupItem value="mind" id="type-mind" className="sr-only" />
-                <Brain className={cn("h-6 w-6", funnelType === 'mind' ? "text-primary" : "text-muted-foreground")} />
-                <span className="text-sm font-medium text-muted-foreground">Mind Map</span>
-                <span className="text-[11px] text-muted-foreground text-center leading-tight">Mapa mental de funis</span>
+                <Brain className="h-5 w-5" />
+                <span className="text-xs font-semibold">Mind Map</span>
+                <span className="text-[10px] opacity-70 leading-tight">Mapas mentais</span>
+              </label>
+
+              <label
+                htmlFor="type-canvas"
+                className={cn(
+                  "flex flex-col items-center justify-between gap-2 rounded-lg border-2 p-3 cursor-pointer transition-colors text-center h-full",
+                  funnelType === 'canvas'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-white"
+                )}
+              >
+                <RadioGroupItem value="canvas" id="type-canvas" className="sr-only" />
+                <Pencil className="h-5 w-5" />
+                <span className="text-xs font-semibold">Canvas</span>
+                <span className="text-[10px] opacity-70 leading-tight">Quadro em branco</span>
               </label>
             </RadioGroup>
           </div>

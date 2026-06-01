@@ -7,6 +7,7 @@ import { FunnelCanvas } from '@/components/funnels/FunnelCanvas';
 import { FunnelsEmptyState } from '@/components/funnels/FunnelsEmptyState';
 import { NewFunnelDialog } from '@/components/funnels/NewFunnelDialog';
 import { MindMapCanvas } from '@/components/mindmap/MindMapCanvas';
+import { CanvasWhiteboard } from '@/components/canvas/CanvasWhiteboard';
 import { useFunnels, Funnel } from '@/hooks/useFunnels';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
@@ -103,6 +104,10 @@ function FunnelsPage() {
             selectedFunnel.funnel_type === 'mind' ? (
               <ReactFlowProvider key={`mind-${selectedFunnel.id}`}>
                 <MindMapCanvas funnel={selectedFunnel} onSave={handleSaveFunnel} isSaving={false} onRegisterFlush={(fn) => { flushCanvasRef.current = fn; }} />
+              </ReactFlowProvider>
+            ) : selectedFunnel.funnel_type === 'canvas' ? (
+              <ReactFlowProvider key={`canvas-${selectedFunnel.id}`}>
+                <CanvasWhiteboard funnel={selectedFunnel} onSave={handleSaveFunnel} isSaving={false} onRegisterFlush={(fn) => { flushCanvasRef.current = fn; }} />
               </ReactFlowProvider>
             ) : (
               <ReactFlowProvider key={`funnel-${selectedFunnel.id}`}>
