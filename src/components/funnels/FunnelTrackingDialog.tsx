@@ -42,7 +42,7 @@ export function FunnelTrackingDialog({
     const data = n.data as { type?: string };
     const type = data.type || '';
     // Include all trackable node types (pages, payment, traffic sources, etc.)
-    return ['page', 'checkout', 'upsell', 'downsell', 'thank-you', 'optin', 'webinar', 'vsl', 'bridge', 'quiz', 'blog', 'social', 'ad', 'email', 'whatsapp', 'sms', 'telegram', 'traffic-source', 'custom'].includes(type) || type !== '';
+    return ['page', 'checkout', 'upsell', 'downsell', 'thank-you', 'optin', 'webinar', 'vsl', 'bridge', 'quiz', 'blog', 'social', 'ad', 'email', 'whatsapp', 'sms', 'telegram', 'traffic-source', 'custom', 'members-area', 'presell'].includes(type) || type !== '';
   });
 
   useEffect(() => {

@@ -48,6 +48,12 @@ import {
   HelpCircle,
   Play,
   Phone,
+  GraduationCap,
+  Search,
+  Handshake,
+  Tv,
+  Webhook,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessageNode } from './MessageNode';
@@ -269,6 +275,15 @@ export const iconMap: Record<string, LucideIcon | React.ComponentType<{ classNam
   'cart': ShoppingBasket,
   'link-bio': Link2,
   'app': AppIcon,
+  'members-area': GraduationCap,
+  'organic-traffic': Search,
+  'affiliates': Handshake,
+  'webinar': Tv,
+  'quiz': QuizFunnelIcon,
+  'vsl': VslIcon,
+  'presell': ScrollText,
+  'webhook': Webhook,
+  'push-notification': Bell,
   'credit-card': CreditCard,
   'boleto': Wallet,
   'pix': PixIcon,
@@ -314,6 +329,15 @@ export const categoryMap: Record<string, 'traffic' | 'page' | 'action' | 'paymen
   'cart': 'page',
   'link-bio': 'page',
   'app': 'page',
+  'members-area': 'page',
+  'organic-traffic': 'traffic',
+  'affiliates': 'traffic',
+  'webinar': 'page',
+  'quiz': 'page',
+  'vsl': 'page',
+  'presell': 'page',
+  'webhook': 'automation',
+  'push-notification': 'automation',
   'credit-card': 'payment',
   'boleto': 'payment',
   'pix': 'payment',
@@ -383,6 +407,26 @@ const iconColorMap: Record<string, { bg: string; icon: string; shadow: string }>
     bg: 'bg-[#10B981]', 
     icon: 'text-white', 
     shadow: 'shadow-[0_4px_20px_rgba(16,185,129,0.4)]' 
+  },
+  'organic-traffic': {
+    bg: 'bg-gradient-to-br from-[#64748B] to-[#475569]',
+    icon: 'text-white',
+    shadow: 'shadow-[0_4px_20px_rgba(100,116,139,0.4)]'
+  },
+  'affiliates': {
+    bg: 'bg-[#F59E0B]',
+    icon: 'text-white',
+    shadow: 'shadow-[0_4px_20px_rgba(245,158,11,0.4)]'
+  },
+  'webhook': {
+    bg: 'bg-gradient-to-br from-[#4F46E5] to-[#7C3AED]',
+    icon: 'text-white',
+    shadow: 'shadow-[0_4px_20px_rgba(79,70,229,0.4)]'
+  },
+  'push-notification': {
+    bg: 'bg-[#FBBF24]',
+    icon: 'text-white',
+    shadow: 'shadow-[0_4px_20px_rgba(251,191,36,0.4)]'
   },
   'credit-card': { 
     bg: 'bg-[#3B82F6]', 
@@ -1161,6 +1205,8 @@ export const funnelElements = {
     { type: 'tiktok-ads', label: 'TikTok Ads', icon: TikTokIcon },
     { type: 'lead-capture', label: 'Lead (Captura)', icon: Users },
     { type: 'pixel', label: 'Pixel', icon: Crosshair },
+    { type: 'organic-traffic', label: 'Tráfego Orgânico', icon: Search },
+    { type: 'affiliates', label: 'Afiliados', icon: Handshake },
   ],
   facebookSubcategories: [
     { type: 'fb-campaign', label: 'Campanha', icon: Megaphone },
@@ -1178,6 +1224,11 @@ export const funnelElements = {
     { type: 'thankyou', label: 'Thank You', icon: CheckCircle },
     { type: 'link-bio', label: 'Link na Bio', icon: Link2 },
     { type: 'app', label: 'App', icon: AppIcon },
+    { type: 'members-area', label: 'Área de Membros', icon: GraduationCap },
+    { type: 'webinar', label: 'Webinário', icon: Tv },
+    { type: 'quiz', label: 'Quiz', icon: QuizFunnelIcon },
+    { type: 'vsl', label: 'VSL', icon: VslIcon },
+    { type: 'presell', label: 'Presell', icon: ScrollText },
   ],
   payment: [
     { type: 'credit-card', label: 'Cartão de Crédito', icon: CreditCard },
@@ -1190,6 +1241,8 @@ export const funnelElements = {
     { type: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
     { type: 'whatsapp-message', label: 'Mensagem WhatsApp', icon: Send },
     { type: 'sms', label: 'SMS', icon: Smartphone },
+    { type: 'webhook', label: 'Webhook', icon: Webhook },
+    { type: 'push-notification', label: 'Push Notification', icon: Bell },
   ],
   actions: [
     { type: 'cta', label: 'CTA', icon: MousePointer },
