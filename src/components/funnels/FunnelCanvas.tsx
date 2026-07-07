@@ -883,9 +883,94 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      // Don't intercept if user is typing in an input/textarea
+      const activeElement = document.activeElement as HTMLElement;
+      if (
+        activeElement &&
+        (activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.clipboardData && e.clipboardData.files.length > 0) {
+        const file = e.clipboardData.files[0];
+        if (file.type.startsWith('image/') && reactFlowInstance) {
+          e.preventDefault();
+          
+          // Get current viewport center for paste position
+          const viewport = reactFlowInstance.getViewport();
+          const centerX = -viewport.x / viewport.zoom + window.innerWidth / (2 * viewport.zoom);
+          const centerY = -viewport.y / viewport.zoom + window.innerHeight / (2 * viewport.zoom);
+          
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+              const newNode: Node = {
+                id: `image-${Date.now()}`,
+                type: 'funnel-image',
+                position: { x: centerX - 100, y: centerY - 100 },
+                data: {
+                  imageUrl: base64,
+                  width: img.width,
+                  height: img.height,
+                },
+              };
+              setNodes((nds) => [...nds, newNode as any]);
+              toast.success('Imagem colada no canvas!');
+            };
+            img.src = base64;
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [reactFlowInstance, setNodes]);
+
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+
+      // Check for image files dropped
+      if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+        const file = event.dataTransfer.files[0];
+        if (file.type.startsWith('image/') && reactFlowInstance) {
+          const position = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+          });
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = e.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+              const newNode: Node = {
+                id: `image-${Date.now()}`,
+                type: 'funnel-image',
+                position,
+                data: {
+                  imageUrl: base64,
+                  width: img.width,
+                  height: img.height,
+                },
+              };
+              setNodes((nds) => [...nds, newNode as any]);
+              toast.success('Imagem adicionada ao canvas!');
+            };
+            img.src = base64;
+          };
+          reader.readAsDataURL(file);
+          return;
+        }
+      }
 
       const type = event.dataTransfer.getData('application/reactflow/type');
       const label = event.dataTransfer.getData('application/reactflow/label');
@@ -1330,6 +1415,29 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
     [setNodes, setEdges, reactFlowInstance]
   );
 
+  const handleAddImage = useCallback((base64: string, width: number, height: number) => {
+    if (!reactFlowInstance) return;
+    
+    // Get current viewport center
+    const viewport = reactFlowInstance.getViewport();
+    const centerX = -viewport.x / viewport.zoom + window.innerWidth / (2 * viewport.zoom);
+    const centerY = -viewport.y / viewport.zoom + window.innerHeight / (2 * viewport.zoom);
+
+    const newNode = {
+      id: `image-${Date.now()}`,
+      type: 'funnel-image',
+      position: { x: centerX - 100, y: centerY - 100 },
+      data: {
+        imageUrl: base64,
+        width,
+        height,
+      },
+    };
+    
+    setNodes((nds) => [...nds, newNode as any]);
+    toast.success('Imagem adicionada ao canvas!');
+  }, [reactFlowInstance, setNodes]);
+
   const handleExport = async (format: 'png' | 'svg') => {
     if (!reactFlowWrapper.current) return;
 
@@ -1395,6 +1503,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
           hasTrackingToken={!!trackingToken}
           onAddStickyNote={() => setInteractionMode(interactionMode === 'sticky-note' ? 'select' : 'sticky-note')}
           onAddFreeText={() => setInteractionMode(interactionMode === 'free-text' ? 'select' : 'free-text')}
+          onAddImage={handleAddImage}
         />
 
         {/* Draw Mode sub-toolbar with Miro-style colors and tools */}
@@ -1561,7 +1670,7 @@ export function FunnelCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Funn
               elementsSelectable={!isRestrictedMode}
               deleteKeyCode={['Delete', 'Backspace']}
               snapToGrid
-              snapGrid={[20, 20]}
+              snapGrid={[4, 4]}
               className="bg-[#0f0f12]"
               proOptions={{ hideAttribution: true }}
             >

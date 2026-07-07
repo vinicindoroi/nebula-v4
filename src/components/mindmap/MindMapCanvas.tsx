@@ -901,6 +901,32 @@ export function MindMapCanvas({ funnel, onSave, isSaving, onRegisterFlush }: Min
       const next = e.key === 'ArrowUp' ? idx - 1 : idx + 1;
       if (next >= 0 && next < siblings.length) setSelectedNodeId(siblings[next]);
     }
+
+    // Start typing to edit
+    if (
+      selectedNodeId && 
+      e.key.length === 1 && 
+      !e.ctrlKey && 
+      !e.metaKey && 
+      !e.altKey &&
+      selectedNodeIds.size <= 1
+    ) {
+      e.preventDefault();
+      setNodes(nds => nds.map(n => {
+        if (n.id === selectedNodeId) {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              _autoEdit: true,
+              _initialChar: e.key
+            }
+          };
+        }
+        return n;
+      }));
+      return;
+    }
   }, [selectedNodeId, selectedNodeIds, nodes, edges, createChildNode, createSiblingNode, deleteNode, setNodes, setEdges, setCenter, getChildren, getParentId, getSiblings]);
 
   useEffect(() => {

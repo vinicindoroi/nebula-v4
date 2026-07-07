@@ -8,6 +8,8 @@ import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import { useEffect, useRef, useState } from "react";
+import Mention from "@tiptap/extension-mention";
+import { getMentionSuggestions } from "./mention-suggestion";
 import {
   Bold, Italic, Underline as UnderlineIcon, Heading1, Heading2, Heading3,
   List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Highlighter,
@@ -48,6 +50,12 @@ export function RichTextEditor({ content, onChange, placeholder = "Escreva aqui.
         HTMLAttributes: {
           class: "text-primary underline hover:text-primary/80 cursor-pointer",
         },
+      }),
+      Mention.configure({
+        HTMLAttributes: {
+          class: 'mention bg-primary/20 text-primary-foreground font-semibold px-1 py-0.5 rounded-md',
+        },
+        suggestion: getMentionSuggestions(),
       }),
     ],
     content,

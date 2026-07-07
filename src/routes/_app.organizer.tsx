@@ -4,7 +4,7 @@ import {
   Trello, Plus, Trash2, ChevronLeft, ChevronRight, CheckSquare, 
   Clock, Sparkles, Pencil, Flame, LayoutGrid, Notebook, StickyNote, Zap,
   DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight, Coins, Percent, Calculator,
-  ArrowUp, ArrowDown
+  ArrowUp, ArrowDown, ChevronDown, Users, Link2
 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/admin/Modal";
@@ -15,6 +15,17 @@ export const Route = createFileRoute("/_app/organizer")({
   component: OrganizerPage,
   head: () => ({ meta: [{ title: "Organização Operacional — Nebula" }] }),
 });
+
+
+type Project = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+const DEFAULT_PROJECTS: Project[] = [
+  { id: "default", name: "Operação Principal", color: "purple" }
+];
 
 type TaskPriority = "alta" | "media" | "baixa";
 
@@ -27,9 +38,21 @@ type Task = {
   category: string;
   date: string;
   subtasks?: { id: string; text: string; completed: boolean }[];
+  links?: { id: string; url: string; title: string }[];
   urgente?: boolean;
   importante?: boolean;
 };
+
+type TeamMember = {
+  id: string;
+  email: string;
+  role: "owner" | "member";
+  avatar?: string;
+};
+
+const DEFAULT_TEAM: TeamMember[] = [
+  { id: "u-1", email: "você@nebula.com", role: "owner", avatar: "https://i.pravatar.cc/150?u=1" }
+];
 
 type Note = {
   id: string;
@@ -169,14 +192,58 @@ function OrganizerPage() {
   }, []);
 
   // --- STATE WITH INSTANT LOCAL STORAGE MOUNT INITIALIZATION ---
-  const [tasks, setTasks] = useState<Task[]>(() => {
+  const [projects, setProjects] = useState<Project[]>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nebula_kanban_tasks");
+      const saved = localStorage.getItem("nebula_kanban_projects");
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         } catch (_) {}
+      }
+    }
+    return DEFAULT_PROJECTS;
+  });
+
+  const [activeProjectId, setActiveProjectId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nebula_kanban_active_project");
+      if (saved) return saved;
+    }
+    return "default";
+  });
+
+  // Effect to load data when project changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("nebula_kanban_active_project", activeProjectId);
+    
+    const loadState = <T,>(key: string, oldKey: string, defaultVal: T): T => {
+      const saved = localStorage.getItem(`${key}_${activeProjectId}`);
+      if (saved) { try { return JSON.parse(saved); } catch {} }
+      else if (activeProjectId === "default") {
+        const oldSaved = localStorage.getItem(oldKey);
+        if (oldSaved) { try { return JSON.parse(oldSaved); } catch {} }
+      }
+      return defaultVal;
+    };
+
+    setTasks(loadState<Task[]>("nebula_kanban_tasks", "nebula_kanban_tasks", activeProjectId === "default" ? DEFAULT_TASKS : []));
+    setColumns(loadState<Column[]>("nebula_kanban_columns", "nebula_kanban_columns", DEFAULT_COLUMNS));
+    setCategories(loadState<string[]>("nebula_kanban_categories", "nebula_kanban_categories", ["Geral", "Tráfego", "Copy", "Tecnologia", "Estratégia", "Sucesso"]));
+    setTransactions(loadState<Transaction[]>("nebula_finances", "nebula_finances", []));
+    setNotes(loadState<Note[]>("nebula_organizer_sticky_notes", "nebula_organizer_sticky_notes", []));
+    setTeamMembers(loadState<TeamMember[]>("nebula_team_members", "nebula_team_members", DEFAULT_TEAM));
+  }, [activeProjectId]);
+
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    if (typeof window !== "undefined") {
+      const pId = localStorage.getItem("nebula_kanban_active_project") || "default";
+      const saved = localStorage.getItem(`nebula_kanban_tasks_${pId}`);
+      if (saved) { try { return JSON.parse(saved); } catch (_) {} }
+      if (pId === "default") {
+        const old = localStorage.getItem("nebula_kanban_tasks");
+        if (old) { try { return JSON.parse(old); } catch (_) {} }
       }
     }
     return DEFAULT_TASKS;
@@ -184,12 +251,12 @@ function OrganizerPage() {
 
   const [columns, setColumns] = useState<Column[]>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nebula_kanban_columns");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
-        } catch (_) {}
+      const pId = localStorage.getItem("nebula_kanban_active_project") || "default";
+      const saved = localStorage.getItem(`nebula_kanban_columns_${pId}`);
+      if (saved) { try { return JSON.parse(saved); } catch (_) {} }
+      if (pId === "default") {
+        const old = localStorage.getItem("nebula_kanban_columns");
+        if (old) { try { return JSON.parse(old); } catch (_) {} }
       }
     }
     return DEFAULT_COLUMNS;
@@ -197,12 +264,12 @@ function OrganizerPage() {
 
   const [categories, setCategories] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nebula_kanban_categories");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
-        } catch (_) {}
+      const pId = localStorage.getItem("nebula_kanban_active_project") || "default";
+      const saved = localStorage.getItem(`nebula_kanban_categories_${pId}`);
+      if (saved) { try { return JSON.parse(saved); } catch (_) {} }
+      if (pId === "default") {
+        const old = localStorage.getItem("nebula_kanban_categories");
+        if (old) { try { return JSON.parse(old); } catch (_) {} }
       }
     }
     return ["Geral", "Tráfego", "Copy", "Tecnologia", "Estratégia", "Sucesso"];
@@ -210,7 +277,12 @@ function OrganizerPage() {
 
   const [notes, setNotes] = useState<Note[]>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nebula_organizer_sticky_notes");
+      const pId = localStorage.getItem("nebula_kanban_active_project") || "default";
+      const saved = localStorage.getItem(`nebula_organizer_sticky_notes_${pId}`);
+      if (!saved && pId === "default") {
+          const old = localStorage.getItem("nebula_organizer_sticky_notes");
+          if (old) return JSON.parse(old);
+      }
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -225,6 +297,32 @@ function OrganizerPage() {
   });
   const [showAllNotes, setShowAllNotes] = useState(false);
   const displayedNotes = showAllNotes ? notes : notes.slice(0, 8);
+
+  // Project creation modal states
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectColor, setNewProjectColor] = useState<string>("purple");
+
+  const handleAddProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+    const newP: Project = { id: crypto.randomUUID(), name: newProjectName.trim(), color: newProjectColor };
+    const updated = [...projects, newP];
+    setProjects(updated);
+    localStorage.setItem("nebula_kanban_projects", JSON.stringify(updated));
+    setActiveProjectId(newP.id);
+    setIsProjectModalOpen(false);
+    setNewProjectName("");
+  };
+
+  const handleDeleteProject = (id: string) => {
+    if (projects.length <= 1) return;
+    const updated = projects.filter(p => p.id !== id);
+    setProjects(updated);
+    localStorage.setItem("nebula_kanban_projects", JSON.stringify(updated));
+    if (activeProjectId === id) setActiveProjectId(updated[0].id);
+  };
 
   // Column creation modal state
   const [isColModalOpen, setIsColModalOpen] = useState(false);
@@ -247,6 +345,9 @@ function OrganizerPage() {
   const [taskDueDate, setTaskDueDate] = useState("");
   const [taskSubtasks, setTaskSubtasks] = useState<{ id: string; text: string; completed: boolean }[]>([]);
   const [newSubtaskText, setNewSubtaskText] = useState("");
+  const [taskLinks, setTaskLinks] = useState<{ id: string; url: string; title: string }[]>([]);
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [newLinkTitle, setNewLinkTitle] = useState("");
   const [taskUrgente, setTaskUrgente] = useState(false);
   const [taskImportante, setTaskImportante] = useState(true);
 
@@ -260,16 +361,65 @@ function OrganizerPage() {
   const [editDueDate, setEditDueDate] = useState("");
   const [editSubtasks, setEditSubtasks] = useState<{ id: string; text: string; completed: boolean }[]>([]);
   const [editNewSubtaskText, setEditNewSubtaskText] = useState("");
+  const [editLinks, setEditLinks] = useState<{ id: string; url: string; title: string }[]>([]);
+  const [editNewLinkUrl, setEditNewLinkUrl] = useState("");
+  const [editNewLinkTitle, setEditNewLinkTitle] = useState("");
   const [editUrgente, setEditUrgente] = useState(false);
   const [editImportante, setEditImportante] = useState(true);
 
   // View modes: standard Kanban vs Eisenhower Matrix vs Financial Control
   const [viewMode, setViewMode] = useState<"kanban" | "eisenhower" | "finance">("kanban");
 
+  // --- TEAM STATE ---
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
+    if (typeof window !== "undefined") {
+      const pId = localStorage.getItem("nebula_kanban_active_project") || "default";
+      const saved = localStorage.getItem(`nebula_team_members_${pId}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (_) {}
+      }
+    }
+    return DEFAULT_TEAM;
+  });
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+
+  const syncTeamMembers = (newTeam: TeamMember[]) => {
+    setTeamMembers(newTeam);
+    localStorage.setItem(`nebula_team_members_${activeProjectId}`, JSON.stringify(newTeam));
+  };
+
+  const handleAddTeamMember = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMemberEmail.trim()) return;
+    const newMember: TeamMember = {
+      id: crypto.randomUUID(),
+      email: newMemberEmail.trim(),
+      role: "member",
+      avatar: `https://i.pravatar.cc/150?u=${Math.random()}`
+    };
+    syncTeamMembers([...teamMembers, newMember]);
+    setNewMemberEmail("");
+    toast.success("Convite enviado com sucesso!");
+  };
+
+  const handleRemoveTeamMember = (id: string) => {
+    syncTeamMembers(teamMembers.filter(m => m.id !== id));
+    toast.success("Membro removido da equipe.");
+  };
+
   // --- FINANCIAL CONTROL STATES ---
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nebula_finances");
+      const pId = localStorage.getItem("nebula_kanban_active_project") || "default";
+      const saved = localStorage.getItem(`nebula_finances_${pId}`);
+      if (!saved && pId === "default") {
+          const old = localStorage.getItem("nebula_finances");
+          if (old) return JSON.parse(old);
+      }
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -306,7 +456,7 @@ function OrganizerPage() {
   // Sync finances helper
   const syncTransactions = (newTransactions: Transaction[]) => {
     setTransactions(newTransactions);
-    localStorage.setItem("nebula_finances", JSON.stringify(newTransactions));
+    localStorage.setItem(`nebula_finances_${activeProjectId}`, JSON.stringify(newTransactions));
     window.dispatchEvent(new Event("storage"));
   };
 
@@ -329,9 +479,7 @@ function OrganizerPage() {
     if (!localStorage.getItem("nebula_kanban_categories")) {
       localStorage.setItem("nebula_kanban_categories", JSON.stringify(categories));
     }
-    if (!localStorage.getItem("nebula_finances")) {
-      localStorage.setItem("nebula_finances", JSON.stringify([]));
-    }
+
   }, []);
 
   // Autofill edit form when task is clicked
@@ -353,7 +501,7 @@ function OrganizerPage() {
   // Sync tasks helper
   const syncTasks = (newTasks: Task[]) => {
     setTasks(newTasks);
-    localStorage.setItem("nebula_kanban_tasks", JSON.stringify(newTasks));
+    localStorage.setItem(`nebula_kanban_tasks_${activeProjectId}`, JSON.stringify(newTasks));
   };
 
   // Keyboard shortcut: N to open new task modal (when not typing in an input)
@@ -395,7 +543,7 @@ function OrganizerPage() {
     };
     const updated = [...columns, newCol];
     setColumns(updated);
-    localStorage.setItem("nebula_kanban_columns", JSON.stringify(updated));
+    localStorage.setItem(`nebula_kanban_columns_${activeProjectId}`, JSON.stringify(updated));
     setNewColTitle("");
     setNewColColor("purple");
     toast.success("Coluna adicionada com sucesso!");
@@ -409,7 +557,7 @@ function OrganizerPage() {
       return;
     }
     setColumns(updatedCols);
-    localStorage.setItem("nebula_kanban_columns", JSON.stringify(updatedCols));
+    localStorage.setItem(`nebula_kanban_columns_${activeProjectId}`, JSON.stringify(updatedCols));
 
     // Reassign tasks to the first remaining column
     const fallbackColId = updatedCols[0].id;
@@ -436,7 +584,7 @@ function OrganizerPage() {
       return c;
     });
     setColumns(updatedCols);
-    localStorage.setItem("nebula_kanban_columns", JSON.stringify(updatedCols));
+    localStorage.setItem(`nebula_kanban_columns_${activeProjectId}`, JSON.stringify(updatedCols));
     setEditingColId(null);
     toast.success("Coluna editada com sucesso!");
   };
@@ -455,7 +603,7 @@ function OrganizerPage() {
     updated[newIndex] = temp;
     
     setColumns(updated);
-    localStorage.setItem("nebula_kanban_columns", JSON.stringify(updated));
+    localStorage.setItem(`nebula_kanban_columns_${activeProjectId}`, JSON.stringify(updated));
   };
 
   // Add subtask helpers
@@ -512,6 +660,7 @@ function OrganizerPage() {
       category: cat,
       date: taskDueDate || new Date().toISOString().split("T")[0],
       subtasks: taskSubtasks,
+      links: taskLinks,
       urgente: taskCol === (columns[0]?.id || "todo") ? true : taskUrgente,
       importante: taskImportante
     };
@@ -529,6 +678,9 @@ function OrganizerPage() {
     setTaskDueDate("");
     setTaskSubtasks([]);
     setNewSubtaskText("");
+    setTaskLinks([]);
+    setNewLinkUrl("");
+    setNewLinkTitle("");
     setTaskUrgente(false);
     setTaskImportante(true);
     toast.success("Tarefa adicionada com sucesso!");
@@ -667,7 +819,7 @@ function OrganizerPage() {
     };
     const updated = [newNote, ...notes];
     setNotes(updated);
-    localStorage.setItem("nebula_organizer_sticky_notes", JSON.stringify(updated));
+    localStorage.setItem(`nebula_organizer_sticky_notes_${activeProjectId}`, JSON.stringify(updated));
     setNewNoteText("");
     toast.success("Nota adicionada ao mural!");
   };
@@ -675,14 +827,14 @@ function OrganizerPage() {
   const handleDeleteNote = (id: string) => {
     const updated = notes.filter((n) => n.id !== id);
     setNotes(updated);
-    localStorage.setItem("nebula_organizer_sticky_notes", JSON.stringify(updated));
+    localStorage.setItem(`nebula_organizer_sticky_notes_${activeProjectId}`, JSON.stringify(updated));
     toast.success("Nota removida.");
   };
 
   const handleUpdateNoteContent = (id: string, newContent: string) => {
     const updated = notes.map((n) => (n.id === id ? { ...n, content: newContent } : n));
     setNotes(updated);
-    localStorage.setItem("nebula_organizer_sticky_notes", JSON.stringify(updated));
+    localStorage.setItem(`nebula_organizer_sticky_notes_${activeProjectId}`, JSON.stringify(updated));
   };
 
   // --- FINANCIAL CONTROL HANDLERS ---
@@ -801,38 +953,102 @@ function OrganizerPage() {
 
   return (
     <div className="space-y-6 stagger-enter pb-16">
-      {/* Hero Welcome banner */}
-      <section className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-primary/[0.06] via-white/[0.01] to-transparent p-6">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/[0.08] rounded-full blur-[60px] -translate-y-1/3 translate-x-1/4 pointer-events-none" />
-        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-primary mb-1.5">
-              <Sparkles className="h-3 w-3" />Workspace Pessoal
-            </div>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
+      {/* Hero Welcome Header */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 relative z-50">
+        <div>
+          <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-primary mb-2">
+            <Sparkles className="h-3 w-3" /> Workspace Pessoal
+          </div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground">
               Quadro de Operações
             </h1>
-            <p className="text-xs text-muted-foreground mt-1 max-w-lg">
-              Organize suas estratégias, campanhas de tráfego, tarefas diárias e gerencie suas colunas livremente.
-            </p>
           </div>
-          
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setIsTaskModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl gradient-primary text-white text-xs font-bold shadow-md flex items-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] transition-transform cursor-pointer animate-[pulse_6s_infinite]"
+          <p className="text-xs text-muted-foreground mt-1.5 max-w-md leading-relaxed">
+            Organize suas estratégias, campanhas e tarefas diárias em uma interface limpa e focada.
+          </p>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 bg-white/[0.02] border border-white/5 rounded-xl p-1 shadow-sm">
+             <div className="relative z-[100]">
+               <button
+                 onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
+                 className="flex items-center justify-between bg-transparent hover:bg-white/5 rounded-lg text-[11px] font-bold text-foreground border-none outline-none py-1.5 px-3 cursor-pointer w-[160px] transition"
+               >
+                 <span className="truncate">{projects.find(p => p.id === activeProjectId)?.name || "Selecione o Projeto"}</span>
+                 <ChevronDown className="h-3 w-3 text-muted-foreground ml-2 shrink-0" />
+               </button>
+               
+               {isProjectDropdownOpen && (
+                 <>
+                   <div className="fixed inset-0 z-40" onClick={() => setIsProjectDropdownOpen(false)} />
+                   <div className="absolute top-full left-0 mt-1 w-full bg-[#0a0a0a] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                     <div className="max-h-[200px] overflow-y-auto py-1">
+                       {projects.map(p => (
+                         <button
+                           key={p.id}
+                           type="button"
+                           onMouseDown={(e) => {
+                             e.preventDefault();
+                             e.stopPropagation();
+                             setActiveProjectId(p.id);
+                             setIsProjectDropdownOpen(false);
+                           }}
+                           className={`w-full text-left px-3 py-2 text-[11px] font-medium transition hover:bg-white/5 ${activeProjectId === p.id ? 'text-primary bg-primary/5' : 'text-foreground/80'}`}
+                         >
+                           {p.name}
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+                 </>
+               )}
+             </div>
+             <button
+               onClick={() => setIsProjectModalOpen(true)}
+               className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition"
+               title="Novo Projeto"
+             >
+               <Plus className="h-3.5 w-3.5" />
+             </button>
+             {projects.length > 1 && (
+               <button
+                 onClick={() => handleDeleteProject(activeProjectId)}
+                 className="p-1.5 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition"
+                 title="Excluir Projeto"
+               >
+                 <Trash2 className="h-3.5 w-3.5" />
+               </button>
+             )}
+          </div>
+                    <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsTeamModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] text-muted-foreground hover:text-foreground text-[11px] font-semibold flex items-center gap-2 transition cursor-pointer"
+              >
+                <div className="flex -space-x-2 mr-1">
+                  {teamMembers.slice(0, 3).map((m, i) => (
+                    <img key={m.id} src={m.avatar} alt="avatar" className="w-5 h-5 rounded-full border border-black z-10" style={{ zIndex: 3 - i }} />
+                  ))}
+                </div>
+                <Users className="h-3.5 w-3.5" /> Equipe
+              </button>
+              <button
+                onClick={() => setIsColModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] text-muted-foreground hover:text-foreground text-[11px] font-semibold flex items-center gap-2 transition cursor-pointer"
             >
-              <Plus className="h-4 w-4" /> Nova Tarefa
+              <Trello className="h-3.5 w-3.5" /> Colunas
             </button>
             <button
-              onClick={() => setIsColModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-foreground text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+              onClick={() => setIsTaskModalOpen(true)}
+              className="px-4 py-2 rounded-xl gradient-primary text-white text-[11px] font-bold shadow-md flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
             >
-              <Trello className="h-4 w-4 text-muted-foreground" /> Gerenciar Colunas
+              <Plus className="h-3.5 w-3.5" /> Nova Tarefa
             </button>
           </div>
         </div>
-      </section>
+      </header>
 
       {/* Dynamic Statistics Panel */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -952,24 +1168,24 @@ function OrganizerPage() {
           </h2>
           
           {/* View Mode Toggle Segmented Control */}
-          <div className="flex items-center bg-white/[0.03] border border-white/[0.06] rounded-lg p-0.5">
+          <div className="flex items-center bg-white/[0.03] border border-white/[0.06] rounded-full p-1 shadow-inner">
             <button 
               onClick={() => setViewMode("kanban")}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-bold flex items-center gap-1.5 transition select-none cursor-pointer ${viewMode === "kanban" ? "bg-primary text-white shadow" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 transition select-none cursor-pointer ${viewMode === "kanban" ? "bg-white/10 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <Trello className="h-3 w-3" /> Kanban
+              <Trello className="h-3.5 w-3.5" /> Kanban
             </button>
             <button 
               onClick={() => setViewMode("eisenhower")}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-bold flex items-center gap-1.5 transition select-none cursor-pointer ${viewMode === "eisenhower" ? "bg-primary text-white shadow" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 transition select-none cursor-pointer ${viewMode === "eisenhower" ? "bg-white/10 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <LayoutGrid className="h-3 w-3" /> Eisenhower
+              <LayoutGrid className="h-3.5 w-3.5" /> Eisenhower
             </button>
             <button 
               onClick={() => setViewMode("finance")}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-bold flex items-center gap-1.5 transition select-none cursor-pointer ${viewMode === "finance" ? "bg-primary text-white shadow" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 transition select-none cursor-pointer ${viewMode === "finance" ? "bg-emerald-500/10 text-emerald-400 shadow-sm" : "text-muted-foreground hover:text-emerald-400/80"}`}
             >
-              <Coins className="h-3 w-3" /> Financeiro
+              <DollarSign className="h-3.5 w-3.5" /> Finanças
             </button>
           </div>
         </div>
@@ -1536,10 +1752,10 @@ function OrganizerPage() {
               onDrop={(e) => handleDropEisenhower(e, true, true)}
               className={`rounded-2xl border transition-all duration-300 p-4 min-h-[240px] flex flex-col gap-3 relative overflow-hidden ${
                 activeDragEisenhower === "q1" 
-                  ? "border-red-500/40 bg-red-500/[0.02] shadow-[0_0_20px_rgba(239,68,68,0.15)] scale-[1.005]" 
+                  ? "border-red-500/40 bg-red-500/[0.04] shadow-[0_0_20px_rgba(239,68,68,0.15)] scale-[1.005]" 
                   : isDragging 
-                    ? "border-dashed border-red-500/20 bg-red-500/[0.003] opacity-85" 
-                    : "border-white/[0.04] bg-black/10"
+                    ? "border-dashed border-red-500/20 bg-red-500/[0.01] opacity-85" 
+                    : "border-red-500/10 bg-red-500/[0.02]"
               }`}
             >
               <div className="absolute top-0 left-0 right-0 h-[2px] bg-red-500/30" />
@@ -1569,10 +1785,10 @@ function OrganizerPage() {
               onDrop={(e) => handleDropEisenhower(e, false, true)}
               className={`rounded-2xl border transition-all duration-300 p-4 min-h-[240px] flex flex-col gap-3 relative overflow-hidden ${
                 activeDragEisenhower === "q2" 
-                  ? "border-amber-500/40 bg-amber-500/[0.02] shadow-[0_0_20px_rgba(245,158,11,0.15)] scale-[1.005]" 
+                  ? "border-amber-500/40 bg-amber-500/[0.04] shadow-[0_0_20px_rgba(245,158,11,0.15)] scale-[1.005]" 
                   : isDragging 
-                    ? "border-dashed border-amber-500/20 bg-amber-500/[0.003] opacity-85" 
-                    : "border-white/[0.04] bg-black/10"
+                    ? "border-dashed border-amber-500/20 bg-amber-500/[0.01] opacity-85" 
+                    : "border-amber-500/10 bg-amber-500/[0.02]"
               }`}
             >
               <div className="absolute top-0 left-0 right-0 h-[2px] bg-amber-500/30" />
@@ -1602,10 +1818,10 @@ function OrganizerPage() {
               onDrop={(e) => handleDropEisenhower(e, true, false)}
               className={`rounded-2xl border transition-all duration-300 p-4 min-h-[240px] flex flex-col gap-3 relative overflow-hidden ${
                 activeDragEisenhower === "q3" 
-                  ? "border-blue-500/40 bg-blue-500/[0.02] shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.005]" 
+                  ? "border-blue-500/40 bg-blue-500/[0.04] shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.005]" 
                   : isDragging 
-                    ? "border-dashed border-blue-500/20 bg-blue-500/[0.003] opacity-85" 
-                    : "border-white/[0.04] bg-black/10"
+                    ? "border-dashed border-blue-500/20 bg-blue-500/[0.01] opacity-85" 
+                    : "border-blue-500/10 bg-blue-500/[0.02]"
               }`}
             >
               <div className="absolute top-0 left-0 right-0 h-[2px] bg-blue-500/30" />
@@ -1635,10 +1851,10 @@ function OrganizerPage() {
               onDrop={(e) => handleDropEisenhower(e, false, false)}
               className={`rounded-2xl border transition-all duration-300 p-4 min-h-[240px] flex flex-col gap-3 relative overflow-hidden ${
                 activeDragEisenhower === "q4" 
-                  ? "border-emerald-500/40 bg-emerald-500/[0.02] shadow-[0_0_20px_rgba(16,185,129,0.15)] scale-[1.005]" 
+                  ? "border-emerald-500/40 bg-emerald-500/[0.04] shadow-[0_0_20px_rgba(16,185,129,0.15)] scale-[1.005]" 
                   : isDragging 
-                    ? "border-dashed border-emerald-500/20 bg-emerald-500/[0.003] opacity-85" 
-                    : "border-white/[0.04] bg-black/10"
+                    ? "border-dashed border-emerald-500/20 bg-emerald-500/[0.01] opacity-85" 
+                    : "border-white/[0.03] bg-white/[0.01]"
               }`}
             >
               <div className="absolute top-0 left-0 right-0 h-[2px] bg-emerald-500/30" />
@@ -1688,22 +1904,21 @@ function OrganizerPage() {
                   onDragOver={(e) => handleDragOver(e, col.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, col.id)}
-                  className={`w-[290px] sm:w-[320px] md:w-auto shrink-0 rounded-2xl border transition-all duration-300 p-3 min-h-[480px] flex flex-col gap-3 relative overflow-hidden ${
+                  className={`w-[290px] sm:w-[320px] md:w-auto shrink-0 rounded-2xl p-2 min-h-[480px] flex flex-col gap-3 relative transition-all duration-300 ${
                     activeDragCol === col.id 
                       ? colColors.activeBorder + " scale-[1.01]" 
                       : isDragging 
                         ? colColors.border + " opacity-80" 
-                        : "border-white/[0.04] bg-black/10"
+                        : "bg-white/[0.015] border border-white/[0.03] backdrop-blur-md shadow-sm"
                   }`}
                 >
-                  <div className={`absolute top-0 left-0 right-0 h-[2px] ${colColors.bar}`} />
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-xs font-bold text-foreground flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${colColors.dot} animate-pulse`} />
+                  <div className="flex items-center justify-between px-2 pt-1 pb-1">
+                    <span className="text-xs font-bold text-foreground/90 flex items-center gap-2">
+                      <span className={`h-1.5 w-1.5 rounded-full ${colColors.dot}`} style={{boxShadow: '0 0 8px currentColor'}} />
                       {col.title}
                     </span>
-                    <span className="text-[10px] bg-white/[0.04] px-2 py-0.5 rounded-full text-muted-foreground font-semibold">
-                      {colTasks.length}
+                    <span className="text-[10px] text-muted-foreground/60 font-semibold">
+                      {colTasks.length} {colTasks.length === 1 ? 'tarefa' : 'tarefas'}
                     </span>
                   </div>
  
@@ -2428,6 +2643,87 @@ function OrganizerPage() {
         </form>
       </Modal>
 
+
+      {/* --- MODAL: TEAM & INVITES --- */}
+      <Modal open={isTeamModalOpen} onClose={() => setIsTeamModalOpen(false)} title="Equipe do Projeto">
+        <div className="space-y-6">
+          <form onSubmit={handleAddTeamMember} className="flex gap-2">
+            <div className="flex-1">
+              <input
+                type="email"
+                value={newMemberEmail}
+                onChange={(e) => setNewMemberEmail(e.target.value)}
+                className="w-full glass rounded-xl px-4 py-2.5 text-sm text-foreground outline-none bg-background focus:border-primary/50 transition-colors"
+                placeholder="E-mail do colaborador..."
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl gradient-primary text-white text-xs font-bold shadow hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer whitespace-nowrap"
+            >
+              Convidar
+            </button>
+          </form>
+
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+            <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Membros Atuais ({teamMembers.length})</h4>
+            {teamMembers.map(member => (
+              <div key={member.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <div className="flex items-center gap-3">
+                  <img src={member.avatar} alt="avatar" className="w-8 h-8 rounded-full border border-white/10" />
+                  <div>
+                    <p className="text-xs font-bold text-foreground">{member.email}</p>
+                    <p className="text-[10px] text-muted-foreground capitalize">{member.role === "owner" ? "Proprietário" : "Membro"}</p>
+                  </div>
+                </div>
+                {member.role !== "owner" && (
+                  <button
+                    onClick={() => handleRemoveTeamMember(member.id)}
+                    className="p-1.5 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-red-400 transition"
+                    title="Remover Membro"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} title="Novo Projeto">
+        <form onSubmit={handleAddProject} className="space-y-4">
+          <div>
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Nome do Projeto</label>
+            <input
+              type="text"
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              className="w-full glass rounded-xl px-4 py-2.5 text-sm text-foreground outline-none bg-background focus:border-primary/50 transition-colors"
+              placeholder="Ex: Lançamento A..."
+              autoFocus
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsProjectModalOpen(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold hover:bg-white/5 border border-transparent transition text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl gradient-primary text-white text-xs font-bold shadow hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer"
+            >
+              Criar Projeto
+            </button>
+          </div>
+        </form>
+      </Modal>
+
     </div>
   );
 }
@@ -2452,37 +2748,23 @@ function KanbanCard({ task, columnColor, onMove, onDelete, onDragStart, onDragEn
 
   const colColor = columnColor || "purple";
 
-  // Dynamic borders and glowing shadows based on column color
-  const colBorders = {
-    red: "border-l-[3.5px] border-l-red-500/80 shadow-[inset_1px_0_0_rgba(239,68,68,0.05)] hover:shadow-[0_12px_40px_rgba(239,68,68,0.08),inset_1px_0_0_rgba(239,68,68,0.15)]",
-    amber: "border-l-[3.5px] border-l-amber-500/80 shadow-[inset_1px_0_0_rgba(245,158,11,0.05)] hover:shadow-[0_12px_40px_rgba(245,158,11,0.08),inset_1px_0_0_rgba(245,158,11,0.15)]",
-    emerald: "border-l-[3.5px] border-l-emerald-500/80 shadow-[inset_1px_0_0_rgba(16,185,129,0.05)] hover:shadow-[0_12px_40px_rgba(16,185,129,0.08),inset_1px_0_0_rgba(16,185,129,0.15)]",
-    blue: "border-l-[3.5px] border-l-blue-500/80 shadow-[inset_1px_0_0_rgba(59,130,246,0.05)] hover:shadow-[0_12px_40px_rgba(59,130,246,0.08),inset_1px_0_0_rgba(59,130,246,0.15)]",
-    purple: "border-l-[3.5px] border-l-primary/80 shadow-[inset_1px_0_0_rgba(139,92,246,0.05)] hover:shadow-[0_12px_40px_rgba(139,92,246,0.08),inset_1px_0_0_rgba(139,92,246,0.15)]",
-    pink: "border-l-[3.5px] border-l-pink-500/80 shadow-[inset_1px_0_0_rgba(236,72,153,0.05)] hover:shadow-[0_12px_40px_rgba(236,72,153,0.08),inset_1px_0_0_rgba(236,72,153,0.15)]",
-    cyan: "border-l-[3.5px] border-l-cyan-500/80 shadow-[inset_1px_0_0_rgba(6,182,212,0.05)] hover:shadow-[0_12px_40px_rgba(6,182,212,0.08),inset_1px_0_0_rgba(6,182,212,0.15)]"
-  }[colColor] || "border-l-[3.5px] border-l-primary/80 shadow-[inset_1px_0_0_rgba(139,92,246,0.05)]";
+  // Dynamic minimalist accents
+  const colDot = {
+    red: "bg-red-500",
+    amber: "bg-amber-500",
+    emerald: "bg-emerald-500",
+    blue: "bg-blue-500",
+    purple: "bg-primary",
+    pink: "bg-pink-500",
+    cyan: "bg-cyan-500"
+  }[colColor] || "bg-primary";
 
-  // Dynamic priority pills based on column color (matching details color)
-  const colPills = {
-    red: "bg-red-500/10 border-red-500/20 text-red-400 shadow-[0_0_6px_rgba(239,68,68,0.05)]",
-    amber: "bg-amber-500/10 border-amber-500/20 text-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.05)]",
-    emerald: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.05)]",
-    blue: "bg-blue-500/10 border-blue-500/20 text-blue-400 shadow-[0_0_6px_rgba(59,130,246,0.05)]",
-    purple: "bg-primary/10 border-primary/20 text-primary shadow-[0_0_6px_rgba(139,92,246,0.05)]",
-    pink: "bg-pink-500/10 border-pink-500/20 text-pink-400 shadow-[0_0_6px_rgba(236,72,153,0.05)]",
-    cyan: "bg-cyan-500/10 border-cyan-500/20 text-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.05)]"
-  }[colColor] || "bg-primary/10 border-primary/20 text-primary";
-
-  const colClocks = {
-    red: "text-red-400/80",
-    amber: "text-amber-400/80",
-    emerald: "text-emerald-400/80",
-    blue: "text-blue-400/80",
-    purple: "text-primary-foreground/80",
-    pink: "text-pink-400/80",
-    cyan: "text-cyan-400/80"
-  }[colColor] || "text-primary/80";
+  const priorityColors = {
+    alta: "bg-red-500/20 text-red-400 border-red-500/30",
+    media: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    baixa: "bg-blue-500/20 text-blue-400 border-blue-500/30"
+  };
+  const prioData = priorityColors[task.priority as keyof typeof priorityColors] || priorityColors.media;
 
   return (
     <div
@@ -2490,127 +2772,73 @@ function KanbanCard({ task, columnColor, onMove, onDelete, onDragStart, onDragEn
       onDragStart={(e) => onDragStart(e, task.id)}
       onDragEnd={onDragEnd}
       onClick={() => onEdit(task)}
-      className={`glass rounded-xl p-4 border border-white/[0.05] bg-gradient-to-br from-white/[0.02] to-white/[0.003] hover:from-white/[0.04] hover:to-white/[0.012] hover:border-white/12 active:scale-[0.985] cursor-pointer hover:cursor-pointer transition-all duration-300 relative group flex flex-col justify-between ${colBorders}`}
+      className="group glass rounded-xl p-3.5 border border-white/[0.04] hover:border-white/10 bg-gradient-to-br from-white/[0.015] to-transparent hover:from-white/[0.03] active:scale-[0.985] cursor-pointer hover:shadow-lg hover:shadow-black/20 transition-all duration-300 relative flex flex-col justify-between"
     >
-      {/* Notion style drag handle overlay */}
-      <div className="absolute left-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-30 transition-all duration-300 pointer-events-none flex flex-col gap-0.5 shrink-0">
-        <div className="flex gap-0.5"><span className="h-0.5 w-0.5 bg-white rounded-full" /><span className="h-0.5 w-0.5 bg-white rounded-full" /></div>
-        <div className="flex gap-0.5"><span className="h-0.5 w-0.5 bg-white rounded-full" /><span className="h-0.5 w-0.5 bg-white rounded-full" /></div>
-        <div className="flex gap-0.5"><span className="h-0.5 w-0.5 bg-white rounded-full" /><span className="h-0.5 w-0.5 bg-white rounded-full" /></div>
-      </div>
-
-      <div className="pl-1.5 w-full">
-        {/* Badges row */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="text-[8px] bg-primary/10 border border-primary/20 text-primary font-extrabold px-2 py-0.5 rounded uppercase tracking-widest">
+      <div className="absolute left-0 top-3 bottom-3 w-[2px] rounded-r-full opacity-60" className={`absolute left-0 top-3 bottom-3 w-[2px] rounded-r-full opacity-60 ${colDot}`} />
+      
+      <div className="pl-2 w-full">
+        {/* Header Badges */}
+        <div className="flex items-center gap-1.5 mb-2.5">
+          <span className="text-[9px] text-muted-foreground/50 font-bold uppercase tracking-widest flex-1 truncate">
             {task.category}
           </span>
-          <span className={`text-[8px] border font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${colPills}`}>
+          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border ${prioData}`}>
             {task.priority}
           </span>
         </div>
 
         {/* Title */}
-        <h4 className="text-xs font-bold text-foreground leading-snug tracking-tight group-hover:text-primary transition-colors duration-200 break-words break-all whitespace-pre-wrap">
+        <h4 className="text-xs font-bold text-foreground/90 leading-relaxed tracking-tight group-hover:text-primary transition-colors duration-200 break-words">
           {task.title}
         </h4>
         
         {/* Description */}
         {task.description && (
-          <p className="text-[10px] text-muted-foreground/75 leading-relaxed font-normal mt-1.5 mb-2 break-words break-all whitespace-pre-wrap overflow-hidden">
+          <p className="text-[10.5px] text-muted-foreground/60 leading-relaxed mt-1.5 mb-2 line-clamp-3 break-words">
             {task.description}
           </p>
         )}
 
-        {/* Subtasks Progress */}
+        {/* Minimal Subtasks */}
         {totalSubtasks > 0 && (
-          <div className="mt-2.5 mb-1.5 space-y-2" onClick={(e) => e.stopPropagation()}>
-            <div 
-              className="flex items-center justify-between text-[9px] font-bold text-muted-foreground hover:text-foreground cursor-pointer transition select-none"
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              <span className="flex items-center gap-1">
-                <CheckSquare className="h-3 w-3 text-primary/70 shrink-0" />
-                Subtarefas ({completedSubtasks}/{totalSubtasks})
-              </span>
-              <span className="text-primary font-extrabold">{subtasksProgress}%</span>
-            </div>
-            
-            <div className="h-1 w-full bg-white/[0.04] rounded-full overflow-hidden">
-              <div 
-                className="h-full gradient-primary rounded-full transition-all duration-300"
-                style={{ width: `${subtasksProgress}%` }}
-              />
-            </div>
-
-            {/* Expandable checklist */}
-            {isExpanded && (
-              <div className="pt-1.5 space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5 stagger-enter">
-                {subtasks.map((st) => (
-                  <label 
-                    key={st.id} 
-                    className="flex items-start gap-2 text-[10px] text-muted-foreground/80 hover:text-foreground cursor-pointer select-none leading-tight"
-                  >
-                    <input 
-                      type="checkbox"
-                      checked={st.completed}
-                      onChange={() => onToggleSubtask(task.id, st.id)}
-                      className="mt-0.5 rounded border-white/10 bg-white/[0.02] text-primary focus:ring-primary/20 accent-primary shrink-0 cursor-pointer h-3 w-3"
-                    />
-                    <span className={`transition-all duration-200 ${st.completed ? "line-through text-muted-foreground/45 italic" : ""} break-words break-all whitespace-pre-wrap`}>
-                      {st.text}
-                    </span>
-                  </label>
-                ))}
+          <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-white/[0.04] rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-300 ${subtasksProgress === 100 ? 'bg-emerald-500' : 'bg-primary/60'}`}
+                  style={{ width: `${subtasksProgress}%` }}
+                />
               </div>
-            )}
+              <span className={`text-[9px] font-bold ${subtasksProgress === 100 ? 'text-emerald-400' : 'text-muted-foreground/60'}`}>
+                {completedSubtasks}/{totalSubtasks}
+              </span>
+            </div>
           </div>
         )}
 
-        {/* Separator & Controls */}
-        <div 
-          className="flex items-center justify-between border-t border-white/[0.04] pt-3 mt-2.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => { e.stopPropagation(); onMove(task.id, "left"); }}
-              className="p-1 hover:bg-white/5 border border-transparent hover:border-white/5 rounded-lg text-muted-foreground/60 hover:text-foreground transition active:scale-95 cursor-pointer shrink-0"
-              title="Mover para esquerda"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onMove(task.id, "right"); }}
-              className="p-1 hover:bg-white/5 border border-transparent hover:border-white/5 rounded-lg text-muted-foreground/60 hover:text-foreground transition active:scale-95 cursor-pointer shrink-0"
-              title="Mover para direita"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {task.date && (
-              <span className="text-[9px] text-muted-foreground/45 font-semibold flex items-center gap-1">
-                <Clock className={`h-2.5 w-2.5 ${colClocks}`} />
-                {task.date.split("-").reverse().slice(0, 2).join("/")}
-              </span>
-            )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-              className="p-1.5 hover:bg-white/5 border border-transparent hover:border-white/10 rounded-lg text-muted-foreground/40 hover:text-foreground md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 cursor-pointer shrink-0"
-              title="Editar tarefa"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-              className="p-1.5 hover:bg-destructive/10 border border-transparent hover:border-destructive/20 rounded-lg text-muted-foreground/40 hover:text-destructive-foreground md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 cursor-pointer shrink-0"
-              title="Excluir tarefa"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
+        {/* Actions Menu */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-md border border-white/10 rounded-lg p-0.5 flex items-center gap-0.5 translate-x-2 group-hover:translate-x-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); onMove(task.id, "left"); }}
+            className="p-1.5 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white transition"
+            title="Mover para esquerda"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onMove(task.id, "right"); }}
+            className="p-1.5 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white transition"
+            title="Mover para direita"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+            className="p-1.5 hover:bg-destructive/20 rounded-md text-muted-foreground hover:text-red-400 transition"
+            title="Excluir tarefa"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
     </div>

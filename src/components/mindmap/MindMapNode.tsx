@@ -26,6 +26,7 @@ export interface MindMapNodeData {
   _hasChildren?: boolean;
   _isDropTarget?: boolean;
   _autoEdit?: boolean;
+  _initialChar?: string;
   _onToggleCollapse?: () => void;
   _onOpenDetail?: () => void;
   _onAddChild?: () => void;
@@ -89,22 +90,45 @@ export function MindMapNode({ id, data, selected }: NodeProps<Node<MindMapNodeDa
   useEffect(() => {
     if (data._autoEdit && !editing) {
       setEditing(true);
-      setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, _autoEdit: false } } : n));
+      
+      if (data._initialChar && contentRef.current) {
+        contentRef.current.textContent = data._initialChar;
+      }
+      
+      setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, _autoEdit: false, _initialChar: undefined } } : n));
     }
-  }, [data._autoEdit, id, setNodes]);
+  }, [data._autoEdit, id, setNodes, data._initialChar, editing]);
 
   // Focus and select all when entering edit mode
   useEffect(() => {
     if (editing && contentRef.current) {
-      contentRef.current.focus();
-      // Select all text
-      const range = document.createRange();
-      range.selectNodeContents(contentRef.current);
-      const sel = window.getSelection();
-      sel?.removeAllRanges();
-      sel?.addRange(range);
+      const focusAndSelect = () => {
+        if (!contentRef.current) return;
+        contentRef.current.focus();
+        
+        const range = document.createRange();
+        const sel = window.getSelection();
+        
+        // If there's an initial char, we just put cursor at the end instead of selecting all
+        if (data._initialChar) {
+          range.selectNodeContents(contentRef.current);
+          range.collapse(false); // collapse to end
+        } else {
+          // Select all text
+          range.selectNodeContents(contentRef.current);
+        }
+        
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      };
+
+      focusAndSelect();
+      // Try again slightly later in case React Flow steals focus after mount
+      setTimeout(focusAndSelect, 10);
+      setTimeout(focusAndSelect, 50);
+      setTimeout(focusAndSelect, 100);
     }
-  }, [editing]);
+  }, [editing, data._initialChar]);
 
   useEffect(() => { editingRef.current = editing; }, [editing]);
 

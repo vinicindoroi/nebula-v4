@@ -2,6 +2,16 @@ import { memo } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, NodeResizer } from '@xyflow/react';
 import { FreeTextNode as FreeTextNodeComponent } from './FreeTextNode';
 import { useFunnelEducationalMode } from './FunnelEducationalContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+} from '@/components/ui/dropdown-menu';
 import { 
   Facebook, 
   Globe, 
@@ -54,6 +64,7 @@ import {
   Tv,
   Webhook,
   Bell,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessageNode } from './MessageNode';
@@ -1101,14 +1112,70 @@ function FunnelNode({ data, selected, id }: NodeProps) {
         />
       )}
       
-      {/* Delete button - appears when selected */}
+      {/* Action buttons - appear when selected */}
       {selected && !isFreeText && (
-        <button
-          onClick={handleDelete}
-          className="absolute -top-2 -right-2 z-10 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg transition-colors"
-        >
-          <X className="w-3 h-3 text-white" />
-        </button>
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="absolute -top-2 -left-2 z-10 w-5 h-5 rounded-full bg-blue-500 hover:bg-blue-600 flex items-center justify-center shadow-lg transition-colors"
+                title="Trocar tipo do bloco"
+              >
+                <RefreshCcw className="w-3 h-3 text-white" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56 bg-[#0f0f12] border-[#2a2a30]" align="start" side="right">
+              {Object.entries(funnelElements).map(([categoryKey, items]) => {
+                 const catNames: Record<string, string> = {
+                    traffic: "Tráfego",
+                    facebookSubcategories: "Anúncios Facebook",
+                    pages: "Páginas",
+                    payment: "Pagamentos",
+                    automation: "Automação",
+                    actions: "Ações",
+                    conditions: "Condições",
+                    notes: "Notas",
+                    ai: "IA",
+                    connectors: "Conectores"
+                 };
+                 const title = catNames[categoryKey] || categoryKey;
+                 return (
+                   <DropdownMenuSub key={categoryKey}>
+                     <DropdownMenuSubTrigger className="text-xs focus:bg-[#2a2a30] data-[state=open]:bg-[#2a2a30]">{title}</DropdownMenuSubTrigger>
+                     <DropdownMenuPortal>
+                       <DropdownMenuSubContent className="bg-[#1a1a1f] border-[#2a2a30]">
+                         {items.map(item => (
+                           <DropdownMenuItem 
+                             key={item.type}
+                             className="text-xs cursor-pointer focus:bg-[#2a2a30]"
+                             onClick={() => {
+                               setNodes((nds) => nds.map((n) => {
+                                 if (n.id === id) {
+                                   return { ...n, data: { ...n.data, type: item.type, label: item.label } };
+                                 }
+                                 return n;
+                               }));
+                             }}
+                           >
+                             <item.icon className="w-4 h-4 mr-2" />
+                             {item.label}
+                           </DropdownMenuItem>
+                         ))}
+                       </DropdownMenuSubContent>
+                     </DropdownMenuPortal>
+                   </DropdownMenuSub>
+                 )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <button
+            onClick={handleDelete}
+            className="absolute -top-2 -right-2 z-10 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg transition-colors"
+          >
+            <X className="w-3 h-3 text-white" />
+          </button>
+        </>
       )}
       {/* 4 visible handles at edges - both source and target for flexibility */}
       {showHandles && (
@@ -1188,10 +1255,64 @@ function FunnelNode({ data, selected, id }: NodeProps) {
   );
 }
 
+// Canvas Image Node Component
+function ImageNode({ data, selected, id }: NodeProps) {
+  const { deleteElements } = useReactFlow();
+  
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteElements({ nodes: [{ id }] });
+  };
+
+  const nodeData = data as any;
+  const imageUrl = nodeData.imageUrl;
+  
+  return (
+    <div className="relative group w-full h-full">
+      <NodeResizer
+        minWidth={50}
+        minHeight={50}
+        isVisible={selected}
+        lineClassName="border-primary"
+        handleClassName="h-2.5 w-2.5 bg-white border-2 border-primary rounded-sm"
+      />
+      
+      {/* Delete button - appears when selected */}
+      {selected && (
+        <button
+          onClick={handleDelete}
+          className="absolute -top-3 -right-3 z-10 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg transition-colors"
+        >
+          <X className="w-3.5 h-3.5 text-white" />
+        </button>
+      )}
+
+      <div 
+        className={cn(
+          "relative overflow-hidden rounded-md flex items-center justify-center w-full h-full",
+          !imageUrl && "bg-muted p-4 min-w-[150px] min-h-[100px]",
+          selected && "ring-2 ring-primary"
+        )}
+      >
+        {imageUrl ? (
+          <img 
+            src={imageUrl} 
+            alt="Canvas Element" 
+            className="w-full h-full object-contain pointer-events-none"
+            draggable={false}
+          />
+        ) : (
+          <ImageIcon className="w-8 h-8 text-muted-foreground opacity-50" />
+        )}
+      </div>
+    </div>
+  );
+}
 
 export const nodeTypes = {
   funnel: memo(FunnelNode),
   'free-text': memo(FreeTextNodeComponent),
+  'funnel-image': memo(ImageNode),
   'message': MessageNode,
 };
 
@@ -1229,6 +1350,7 @@ export const funnelElements = {
     { type: 'quiz', label: 'Quiz', icon: QuizFunnelIcon },
     { type: 'vsl', label: 'VSL', icon: VslIcon },
     { type: 'presell', label: 'Presell', icon: ScrollText },
+    { type: 'form', label: 'Formulário', icon: ClipboardList },
   ],
   payment: [
     { type: 'credit-card', label: 'Cartão de Crédito', icon: CreditCard },

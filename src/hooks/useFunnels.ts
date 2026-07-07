@@ -14,6 +14,7 @@ export interface Funnel {
   edges: Edge[];
   viewport: Viewport;
   tracking_token: string | null;
+  folder_id: string | null;
   funnel_type: string;
   created_at: string;
   updated_at: string;
@@ -41,6 +42,7 @@ interface UpdateFunnelData {
   nodes?: Node[];
   edges?: Edge[];
   viewport?: Viewport;
+  folder_id?: string | null;
 }
 
 export function useFunnels() {
@@ -67,6 +69,7 @@ export function useFunnels() {
         edges: (funnel.edges as unknown as Edge[]) || [],
         viewport: (funnel.viewport as unknown as Viewport) || { x: 0, y: 0, zoom: 1 },
         tracking_token: funnel.tracking_token || null,
+        folder_id: funnel.folder_id || null,
         funnel_type: funnel.funnel_type || 'funnelytics',
       })) as Funnel[];
     },
@@ -137,6 +140,39 @@ export function useFunnels() {
     }
   });
 
+  const duplicateFunnel = useMutation({
+    mutationFn: async (funnelToDuplicate: Funnel) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Não autenticado');
+
+      const { data: funnel, error } = await supabase
+        .from('funnels')
+        .insert({
+          user_id: user.id,
+          organization_id: organization?.id || null,
+          name: `${funnelToDuplicate.name} (Cópia)`,
+          description: funnelToDuplicate.description || null,
+          funnel_type: funnelToDuplicate.funnel_type,
+          folder_id: funnelToDuplicate.folder_id || null,
+          nodes: funnelToDuplicate.nodes as unknown as Json,
+          edges: funnelToDuplicate.edges as unknown as Json,
+          viewport: funnelToDuplicate.viewport as unknown as Json
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return funnel;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['funnels'] });
+      toast.success('Funil duplicado com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao duplicar funil: ' + error.message);
+    }
+  });
+
   const updateFunnel = useMutation({
     mutationFn: async (data: UpdateFunnelData) => {
       const updateData: Record<string, unknown> = {};
@@ -146,6 +182,7 @@ export function useFunnels() {
       if (data.nodes !== undefined) updateData.nodes = data.nodes as unknown as Json;
       if (data.edges !== undefined) updateData.edges = data.edges as unknown as Json;
       if (data.viewport !== undefined) updateData.viewport = data.viewport as unknown as Json;
+      if (data.folder_id !== undefined) updateData.folder_id = data.folder_id;
 
       const { data: funnel, error } = await supabase
         .from('funnels')
@@ -190,6 +227,7 @@ export function useFunnels() {
     error,
     createFunnel,
     importFunnel,
+    duplicateFunnel,
     updateFunnel,
     deleteFunnel
   };

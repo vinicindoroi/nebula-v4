@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { sendMentionNotifications } from "@/lib/mentions";
 import { toast } from "sonner";
 import { MembersSidebar } from "@/components/members/MembersSidebar";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
@@ -476,6 +477,7 @@ function CommunityPage() {
       if (error) throw error;
     },
     onSuccess: () => { 
+      sendMentionNotifications(text, myProfile?.full_name || "Alguém", "Comunidade");
       setText(""); 
       removeImage(); 
       qc.invalidateQueries({ queryKey: ["posts"] }); 
@@ -1480,7 +1482,10 @@ function CommentSection({ postId, postOwnerId, comments, userId }: { postId: str
       const actorName = profile?.full_name || "Alguém";
       notifyUser({ recipientId: postOwnerId, actorId: userId, title: "Novo comentário no seu post", content: `${actorName} comentou no seu post` });
     },
-    onSuccess: () => { setText(""); clearImg(); qc.invalidateQueries({ queryKey: ["posts"] }); addXp.mutate("comment"); },
+    onSuccess: () => { 
+      sendMentionNotifications(text, "Alguém", "Comunidade (Comentário)");
+      setText(""); clearImg(); qc.invalidateQueries({ queryKey: ["posts"] }); addXp.mutate("comment"); 
+    },
     onError: (e: any) => toast.error(e.message),
   });
 

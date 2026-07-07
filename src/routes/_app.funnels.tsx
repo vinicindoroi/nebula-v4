@@ -9,6 +9,7 @@ import { NewFunnelDialog } from '@/components/funnels/NewFunnelDialog';
 import { MindMapCanvas } from '@/components/mindmap/MindMapCanvas';
 import { CanvasWhiteboard } from '@/components/canvas/CanvasWhiteboard';
 import { useFunnels, Funnel } from '@/hooks/useFunnels';
+import { useFunnelFolders, FunnelFolder } from '@/hooks/useFunnelFolders';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
 import { cn } from '@/lib/utils';
@@ -28,7 +29,10 @@ function FunnelsPage() {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const { organization } = useOrganizationContext();
-  const { funnels, isLoading, createFunnel, importFunnel, updateFunnel, deleteFunnel } = useFunnels();
+  const { funnels, isLoading: isLoadingFunnels, createFunnel, importFunnel, updateFunnel, deleteFunnel, duplicateFunnel } = useFunnels();
+  const { folders, isLoading: isLoadingFolders, createFolder, updateFolder, deleteFolder } = useFunnelFolders();
+
+  const isLoading = isLoadingFunnels || isLoadingFolders;
 
   const flushCanvasRef = useRef<(() => void) | null>(null);
   const silentSaveInFlightRef = useRef(false);
@@ -77,6 +81,11 @@ function FunnelsPage() {
     await updateFunnel.mutateAsync({ id, name });
   };
 
+  const handleDuplicateFunnel = async (funnelToDuplicate: Funnel) => {
+    const result = await duplicateFunnel.mutateAsync(funnelToDuplicate);
+    setSelectedFunnel(result as unknown as Funnel);
+  };
+
   const handleImportFunnel = async (data: { name: string; nodes: Node[]; edges: Edge[]; viewport?: Viewport; funnel_type?: string }) => {
     const result = await importFunnel.mutateAsync(data);
     setSelectedFunnel(result as unknown as Funnel);
@@ -98,7 +107,24 @@ function FunnelsPage() {
   return (
     <div className={cn("flex flex-col bg-background overflow-hidden", isMobile ? "h-[calc(100dvh-4rem)]" : "h-[100dvh]")}>
       <main className="flex-1 flex overflow-hidden h-full">
-        <FunnelsSidebar funnels={funnels} selectedFunnel={selectedFunnel} onSelectFunnel={handleSelectFunnel} onCreateFunnel={() => setIsNewFunnelDialogOpen(true)} onDeleteFunnel={handleDeleteFunnel} onRenameFunnel={handleRenameFunnel} onImportFunnel={handleImportFunnel} isLoading={isLoading} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)} />
+        <FunnelsSidebar 
+          funnels={funnels} 
+          folders={folders}
+          selectedFunnel={selectedFunnel} 
+          onSelectFunnel={handleSelectFunnel} 
+          onCreateFunnel={() => setIsNewFunnelDialogOpen(true)} 
+          onDeleteFunnel={handleDeleteFunnel} 
+          onRenameFunnel={handleRenameFunnel} 
+          onDuplicateFunnel={handleDuplicateFunnel}
+          onMoveFunnel={async (id, folderId) => { await updateFunnel.mutateAsync({ id, folder_id: folderId }); }}
+          onImportFunnel={handleImportFunnel} 
+          onCreateFolder={async (name) => { await createFolder.mutateAsync({ name }); }}
+          onRenameFolder={async (id, name) => { await updateFolder.mutateAsync({ id, name }); }}
+          onDeleteFolder={async (id) => { await deleteFolder.mutateAsync(id); }}
+          isLoading={isLoading} 
+          collapsed={sidebarCollapsed} 
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        />
         <div className="flex-1 h-full overflow-hidden">
           {selectedFunnel ? (
             selectedFunnel.funnel_type === 'mind' ? (

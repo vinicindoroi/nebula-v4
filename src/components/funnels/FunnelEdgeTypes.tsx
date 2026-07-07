@@ -4,7 +4,8 @@ import {
   getBezierPath, 
   EdgeLabelRenderer,
   BaseEdge,
-  useReactFlow
+  useReactFlow,
+  Position
 } from '@xyflow/react';
 import { Settings2, Trash2, GripHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,7 @@ const edgeStyleMap: Record<string, { stroke: string; strokeDasharray: string }> 
 function FunnelEdge({
   id,
   source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -62,33 +64,118 @@ function FunnelEdge({
   const sourceNode = useMemo(() => {
     const nodes = getNodes();
     return nodes.find(n => n.id === source);
-  }, [getNodes, source]);
+  }, [getNodes, source, sourceX, sourceY]);
   
+  const targetNode = useMemo(() => {
+    const nodes = getNodes();
+    return nodes.find(n => n.id === target);
+  }, [getNodes, target, targetX, targetY]);
+
   const isFromAbTest = (sourceNode?.data as FunnelNodeData)?.type === 'ab-test';
 
   const currentStyle = edgeData?.style || 'dashed';
   const styleConfig = edgeStyleMap[currentStyle] || edgeStyleMap.dashed;
   const currentCurvature = edgeData?.curvature ?? 0.25;
+  const isSmartRouting = edgeData?.smartRouting ?? false;
+
+  // Compute smart positions and coordinates
+  const { sx, sy, tx, ty, sp, tp } = useMemo(() => {
+    let sx = sourceX;
+    let sy = sourceY;
+    let sp = sourcePosition;
+    let tx = targetX;
+    let ty = targetY;
+    let tp = targetPosition;
+
+    try {
+      if (isSmartRouting && sourceNode && targetNode && sourceNode.measured && targetNode.measured) {
+        // Use internal absolute position if available, otherwise fallback to relative
+        const sPos = sourceNode.internals?.positionAbsolute || sourceNode.position;
+        const tPos = targetNode.internals?.positionAbsolute || targetNode.position;
+        
+        if (sPos && tPos) {
+          const sWidth = sourceNode.measured.width || 100;
+          const sHeight = sourceNode.measured.height || 100;
+          const tWidth = targetNode.measured.width || 100;
+          const tHeight = targetNode.measured.height || 100;
+
+          const sCenter = { x: sPos.x + sWidth / 2, y: sPos.y + sHeight / 2 };
+          const tCenter = { x: tPos.x + tWidth / 2, y: tPos.y + tHeight / 2 };
+
+          const dx = tCenter.x - sCenter.x;
+          const dy = tCenter.y - sCenter.y;
+
+          if (Math.abs(dx) > Math.abs(dy)) {
+            // Horizontal connection
+            if (dx > 0) {
+              sp = Position.Right;
+              tp = Position.Left;
+              sx = sPos.x + sWidth;
+              sy = sCenter.y;
+              tx = tPos.x;
+              ty = tCenter.y;
+            } else {
+              sp = Position.Left;
+              tp = Position.Right;
+              sx = sPos.x;
+              sy = sCenter.y;
+              tx = tPos.x + tWidth;
+              ty = tCenter.y;
+            }
+          } else {
+            // Vertical connection
+            if (dy > 0) {
+              sp = Position.Bottom;
+              tp = Position.Top;
+              sx = sCenter.x;
+              sy = sPos.y + sHeight;
+              tx = tCenter.x;
+              ty = tPos.y;
+            } else {
+              sp = Position.Top;
+              tp = Position.Bottom;
+              sx = sCenter.x;
+              sy = sPos.y;
+              tx = tCenter.x;
+              ty = tPos.y + tHeight;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error computing smart edge positions:", err);
+      // Fallback to defaults
+      sx = sourceX; sy = sourceY; sp = sourcePosition;
+      tx = targetX; ty = targetY; tp = targetPosition;
+    }
+    
+    return { sx, sy, tx, ty, sp, tp };
+  }, [isSmartRouting, sourceNode, targetNode, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]);
 
   // Use getStraightPath for curvature 0, otherwise use getBezierPath
   const [edgePath, labelX, labelY] = useMemo(() => {
-    if (currentCurvature === 0) {
-      // Calculate straight path manually
-      const path = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
-      const midX = (sourceX + targetX) / 2;
-      const midY = (sourceY + targetY) / 2;
-      return [path, midX, midY];
+    try {
+      if (currentCurvature === 0) {
+        // Calculate straight path manually
+        const path = `M ${sx},${sy} L ${tx},${ty}`;
+        const midX = (sx + tx) / 2;
+        const midY = (sy + ty) / 2;
+        return [path, midX, midY];
+      }
+      return getBezierPath({
+        sourceX: sx,
+        sourceY: sy,
+        sourcePosition: sp || Position.Right,
+        targetX: tx,
+        targetY: ty,
+        targetPosition: tp || Position.Left,
+        curvature: currentCurvature,
+      });
+    } catch (err) {
+      console.error("Error computing edge path:", err);
+      return [`M ${sourceX},${sourceY} L ${targetX},${targetY}`, (sourceX + targetX) / 2, (sourceY + targetY) / 2];
     }
-    return getBezierPath({
-      sourceX,
-      sourceY,
-      sourcePosition,
-      targetX,
-      targetY,
-      targetPosition,
-      curvature: currentCurvature,
-    });
-  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, currentCurvature]);
+  }, [sx, sy, tx, ty, sp, tp, currentCurvature, sourceX, sourceY, targetX, targetY]);
 
   const handleLabelChange = (newLabel: string) => {
     setLabelValue(newLabel);
@@ -441,6 +528,36 @@ function FunnelEdge({
                   </svg>
                 </div>
                 Curva Forte
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-[#2a2a30]" />
+              <DropdownMenuItem 
+                onClick={() => {
+                  setEdges((edges) =>
+                    edges.map((edge) => {
+                      if (edge.id === id) {
+                        return {
+                          ...edge,
+                          data: { ...edge.data, smartRouting: !isSmartRouting },
+                        };
+                      }
+                      return edge;
+                    })
+                  );
+                }} 
+                className="text-xs"
+              >
+                <div className="w-6 mr-2 flex justify-center">
+                  <div className={cn(
+                    "w-6 h-3.5 rounded-full relative transition-colors",
+                    isSmartRouting ? "bg-primary" : "bg-white/10"
+                  )}>
+                    <div className={cn(
+                      "absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-transform",
+                      isSmartRouting ? "left-[13px]" : "left-0.5"
+                    )} />
+                  </div>
+                </div>
+                Roteamento Automático
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-[#2a2a30]" />
               <DropdownMenuItem 

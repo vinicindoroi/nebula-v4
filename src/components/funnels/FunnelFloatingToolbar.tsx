@@ -1,6 +1,7 @@
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Download, Radio, Hand, MousePointer2, Check, Loader2, Group, GraduationCap, Upload, Ungroup, Code, Pencil, StickyNote, Type } from 'lucide-react';
+import { Download, Radio, Hand, MousePointer2, Check, Loader2, Group, GraduationCap, Upload, Ungroup, Code, Pencil, StickyNote, Type, Image as ImageIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,7 @@ interface FunnelFloatingToolbarProps {
   hasTrackingToken?: boolean;
   onAddStickyNote?: () => void;
   onAddFreeText?: () => void;
+  onAddImage?: (base64: string, width: number, height: number) => void;
 }
 
 export function FunnelFloatingToolbar({
@@ -51,13 +53,32 @@ export function FunnelFloatingToolbar({
   hasTrackingToken = false,
   onAddStickyNote,
   onAddFreeText,
+  onAddImage,
 }: FunnelFloatingToolbarProps) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onImportJson) {
       onImportJson(file);
       e.target.value = '';
     }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onAddImage) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        onAddImage(base64, img.width, img.height);
+      };
+      img.src = base64;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   return (
@@ -109,10 +130,30 @@ export function FunnelFloatingToolbar({
       </div>
 
       {/* Annotations Tools next to Freehand Drawing */}
-      {(onAddStickyNote || onAddFreeText) && (
+      {(onAddStickyNote || onAddFreeText || onAddImage) && (
         <>
           <div className="w-px h-5 bg-white/10" />
           <div className="flex items-center bg-white/[0.04] rounded-full p-0.5 border border-white/5">
+            {onAddImage && (
+              <>
+                <input 
+                  type="file" 
+                  ref={imageInputRef} 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="h-7 w-7 p-0 rounded-full transition-all hover:bg-white/[0.06] text-muted-foreground"
+                  title="Adicionar Imagem"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            )}
             {onAddStickyNote && (
               <Button
                 variant="ghost"

@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { Modal, Field, inputClass } from "@/components/admin/Modal";
+import { sendMentionNotifications } from "@/lib/mentions";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { notifyUser } from "@/lib/notify";
 import { useSavedPosts, useToggleSave } from "@/hooks/use-saved-posts";
@@ -441,7 +442,10 @@ function PostDetailModal({ post, userId, onClose, onLike }: { post: ForumPost; u
       const { error } = await db.from("forum_replies").insert({ post_id: post.id, user_id: userId, content: content || "", image_url });
       if (error) throw error;
     },
-    onSuccess: () => { setReplyText(""); clearReplyImg(); qc.invalidateQueries({ queryKey: ["forum-replies", post.id] }); qc.invalidateQueries({ queryKey: ["forum"] }); addXp.mutate("forum_reply"); },
+    onSuccess: () => { 
+      sendMentionNotifications(replyText, "Alguém", "Fórum (Resposta)");
+      setReplyText(""); clearReplyImg(); qc.invalidateQueries({ queryKey: ["forum-replies", post.id] }); qc.invalidateQueries({ queryKey: ["forum"] }); addXp.mutate("forum_reply"); 
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -611,7 +615,9 @@ function CreatePostModal({ tags, onClose, onCreated }: { tags: ForumTag[]; onClo
     const { data: post, error } = await db.from("forum_posts").insert({ user_id: user!.id, title: form.title.trim(), content: form.content.trim(), image_url, is_service: form.is_service, service_price: form.is_service && form.service_price.trim() ? form.service_price.trim() : null }).select("id").single();
     if (error) { toast.error(error.message); setSaving(false); return; }
     if (selectedTags.length > 0 && post) await db.from("forum_post_tags").insert(selectedTags.map((tag_id) => ({ post_id: post.id, tag_id })));
-    setSaving(false); toast.success("Post criado!"); onCreated();
+    setSaving(false); toast.success("Post criado!"); 
+    sendMentionNotifications(form.content, "Alguém", "Fórum");
+    onCreated();
   };
 
   return (

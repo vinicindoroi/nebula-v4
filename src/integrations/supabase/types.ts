@@ -51,6 +51,7 @@ export type Database = {
           edges: Json
           viewport: Json
           tracking_token: string | null
+          folder_id: string | null
           created_at: string
           updated_at: string
         }
@@ -65,6 +66,7 @@ export type Database = {
           edges?: Json
           viewport?: Json
           tracking_token?: string | null
+          folder_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -79,11 +81,46 @@ export type Database = {
           edges?: Json
           viewport?: Json
           tracking_token?: string | null
+          folder_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnels_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "funnel_folders"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      funnel_folders: {
+        Row: {
+          id: string
+          user_id: string
+          organization_id: string | null
+          name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          organization_id?: string | null
+          name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          organization_id?: string | null
+          name?: string
           created_at?: string
           updated_at?: string
         }
         Relationships: []
-      }
       funnel_events: {
         Row: {
           id: string
